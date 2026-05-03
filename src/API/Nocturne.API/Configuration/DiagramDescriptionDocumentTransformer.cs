@@ -29,7 +29,14 @@ public sealed class DiagramDescriptionDocumentTransformer : IOpenApiDocumentTran
 
     private static string BuildDescription(IWebHostEnvironment env)
     {
-        var manifestPath = Path.Combine(env.ContentRootPath, "..", "..", "..", "docs", "diagrams", "diagrams.yaml");
+        // Prefer the copy under wwwroot (shipped in the container alongside the SVGs).
+        // Fall back to the repo source path for local runs where wwwroot isn't populated yet.
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var manifestPath = Path.Combine(webRoot, "diagrams", "diagrams.yaml");
+        if (!File.Exists(manifestPath))
+        {
+            manifestPath = Path.Combine(env.ContentRootPath, "..", "..", "..", "docs", "diagrams", "diagrams.yaml");
+        }
 
         if (!File.Exists(manifestPath))
         {
