@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Mappers.V4;
+using Nocturne.Infrastructure.Data.Services;
 
 namespace Nocturne.Infrastructure.Data.Repositories.V4;
 
@@ -11,17 +12,17 @@ namespace Nocturne.Infrastructure.Data.Repositories.V4;
 /// </summary>
 public class ApsSnapshotRepository : IApsSnapshotRepository
 {
-    private readonly NocturneDbContext _context;
+    private readonly ITenantDbContextFactory _contextFactory;
     private readonly ILogger<ApsSnapshotRepository> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ApsSnapshotRepository"/> class.
     /// </summary>
-    /// <param name="context">The database context.</param>
+    /// <param name="contextFactory">The tenant database context factory.</param>
     /// <param name="logger">The logger instance.</param>
-    public ApsSnapshotRepository(NocturneDbContext context, ILogger<ApsSnapshotRepository> logger)
+    public ApsSnapshotRepository(ITenantDbContextFactory contextFactory, ILogger<ApsSnapshotRepository> logger)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _logger = logger;
     }
 
@@ -42,7 +43,8 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
         int limit = 100, int offset = 0, bool descending = true,
         CancellationToken ct = default)
     {
-        var query = _context.ApsSnapshots.AsNoTracking().AsQueryable();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.ApsSnapshots.AsNoTracking().AsQueryable();
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
         if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
         if (device != null) query = query.Where(e => e.Device == device);
@@ -59,7 +61,8 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// <returns>The APS snapshot, or null if not found.</returns>
     public async Task<ApsSnapshot?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var entity = await _context.ApsSnapshots.FindAsync([id], ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.ApsSnapshots.FindAsync([id], ct);
         return entity is null ? null : ApsSnapshotMapper.ToDomainModel(entity);
     }
 
@@ -71,7 +74,8 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// <returns>The APS snapshot, or null if not found.</returns>
     public async Task<ApsSnapshot?> GetByLegacyIdAsync(string legacyId, CancellationToken ct = default)
     {
-        var entity = await _context.ApsSnapshots.FirstOrDefaultAsync(e => e.LegacyId == legacyId, ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.ApsSnapshots.FirstOrDefaultAsync(e => e.LegacyId == legacyId, ct);
         return entity is null ? null : ApsSnapshotMapper.ToDomainModel(entity);
     }
 
@@ -83,9 +87,10 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// <returns>The created APS snapshot.</returns>
     public async Task<ApsSnapshot> CreateAsync(ApsSnapshot model, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity = ApsSnapshotMapper.ToEntity(model);
-        _context.ApsSnapshots.Add(entity);
-        await _context.SaveChangesAsync(ct);
+        ctx.ApsSnapshots.Add(entity);
+        await ctx.SaveChangesAsync(ct);
         return ApsSnapshotMapper.ToDomainModel(entity);
     }
 
@@ -98,10 +103,11 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// <returns>The updated APS snapshot.</returns>
     public async Task<ApsSnapshot> UpdateAsync(Guid id, ApsSnapshot model, CancellationToken ct = default)
     {
-        var entity = await _context.ApsSnapshots.FindAsync([id], ct)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.ApsSnapshots.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"ApsSnapshot {id} not found");
         ApsSnapshotMapper.UpdateEntity(entity, model);
-        await _context.SaveChangesAsync(ct);
+        await ctx.SaveChangesAsync(ct);
         return ApsSnapshotMapper.ToDomainModel(entity);
     }
 
@@ -112,10 +118,60 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// <param name="ct">The cancellation token.</param>
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var entity = await _context.ApsSnapshots.FindAsync([id], ct)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.ApsSnapshots.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"ApsSnapshot {id} not found");
-        _context.ApsSnapshots.Remove(entity);
-        await _context.SaveChangesAsync(ct);
+        entity.DeletedAt = DateTime.UtcNow;
+        await ctx.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<ApsSnapshot> RestoreAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.ApsSnapshots.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.Id == id && e.DeletedAt != null)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException($"Soft-deleted ApsSnapshot {id} not found");
+        entity.DeletedAt = null;
+        await ctx.SaveChangesAsync(ct);
+        return ApsSnapshotMapper.ToDomainModel(entity);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<ApsSnapshot>> BulkRestoreAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var idSet = ids.ToHashSet();
+        var entities = await ctx.ApsSnapshots.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && idSet.Contains(e.Id) && e.DeletedAt != null)
+            .ToListAsync(ct);
+        foreach (var entity in entities)
+            entity.DeletedAt = null;
+        await ctx.SaveChangesAsync(ct);
+        return entities.Select(ApsSnapshotMapper.ToDomainModel);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<ApsSnapshot>> GetDeletedAsync(int limit, int offset, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entities = await ctx.ApsSnapshots.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.DeletedAt != null)
+            .OrderByDescending(e => e.DeletedAt)
+            .Skip(offset).Take(limit)
+            .AsNoTracking()
+            .ToListAsync(ct);
+        return entities.Select(ApsSnapshotMapper.ToDomainModel);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountDeletedAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.ApsSnapshots.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.DeletedAt != null)
+            .CountAsync(ct);
     }
 
     /// <summary>
@@ -130,7 +186,8 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
         var ids = correlationIds.ToList();
         if (ids.Count == 0) return [];
 
-        var entities = await _context.ApsSnapshots
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entities = await ctx.ApsSnapshots
             .AsNoTracking()
             .Where(e => e.CorrelationId != null && ids.Contains(e.CorrelationId.Value))
             .ToListAsync(ct);
@@ -148,8 +205,9 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     public async Task<IEnumerable<ApsSnapshot>> GetModifiedSinceAsync(
         long lastModifiedMills, int limit = 1000, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var since = DateTimeOffset.FromUnixTimeMilliseconds(lastModifiedMills).UtcDateTime;
-        var entities = await _context.ApsSnapshots
+        var entities = await ctx.ApsSnapshots
             .AsNoTracking()
             .Where(e => e.SysUpdatedAt >= since)
             .OrderBy(e => e.SysUpdatedAt)
@@ -168,7 +226,8 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// <returns>The count of matching records.</returns>
     public async Task<int> CountAsync(DateTime? from, DateTime? to, CancellationToken ct = default)
     {
-        var query = _context.ApsSnapshots.AsNoTracking().AsQueryable();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.ApsSnapshots.AsNoTracking().AsQueryable();
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
         if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
         return await query.CountAsync(ct);
@@ -182,15 +241,17 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// <returns>The number of deleted records.</returns>
     public async Task<int> DeleteByLegacyIdAsync(string legacyId, CancellationToken ct = default)
     {
-        return await _context.ApsSnapshots
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.ApsSnapshots
             .Where(e => e.LegacyId == legacyId)
-            .ExecuteDeleteAsync(ct);
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.DeletedAt, DateTime.UtcNow), ct);
     }
 
     /// <inheritdoc />
     public async Task<DateTime?> GetLatestTimestampAsync(DateTime? asOf, CancellationToken ct = default)
     {
-        var query = _context.ApsSnapshots.AsNoTracking();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.ApsSnapshots.AsNoTracking();
         if (asOf.HasValue) query = query.Where(e => e.Timestamp <= asOf.Value);
         return await query
             .OrderByDescending(e => e.Timestamp)
@@ -201,7 +262,8 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// <inheritdoc />
     public async Task<DateTime?> GetLatestEnactedTimestampAsync(DateTime? asOf, CancellationToken ct = default)
     {
-        var query = _context.ApsSnapshots.AsNoTracking().Where(e => e.Enacted);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.ApsSnapshots.AsNoTracking().Where(e => e.Enacted);
         if (asOf.HasValue) query = query.Where(e => e.Timestamp <= asOf.Value);
         return await query
             .OrderByDescending(e => e.Timestamp)
@@ -215,7 +277,8 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
     /// </remarks>
     public async Task<decimal?> GetLatestSensitivityRatioAsync(DateTime? asOf, CancellationToken ct = default)
     {
-        var query = _context.ApsSnapshots.AsNoTracking().Where(e => e.SensitivityRatio != null);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.ApsSnapshots.AsNoTracking().Where(e => e.SensitivityRatio != null);
         if (asOf.HasValue) query = query.Where(e => e.Timestamp <= asOf.Value);
         var value = await query
             .OrderByDescending(e => e.Timestamp)
@@ -245,31 +308,49 @@ public class ApsSnapshotRepository : IApsSnapshotRepository
             .Select(e => e.LegacyId!)
             .ToHashSet();
 
-        if (legacyIds.Count > 0)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var strategy = ctx.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var existingIds = await _context
-                .ApsSnapshots.AsNoTracking()
-                .Where(e => legacyIds.Contains(e.LegacyId!))
-                .Select(e => e.LegacyId)
-                .ToListAsync(ct);
+            await using var tx = await ctx.Database.BeginTransactionAsync(ct);
 
-            var existingSet = existingIds.ToHashSet();
-            entities = entities
-                .Where(e => string.IsNullOrEmpty(e.LegacyId) || !existingSet.Contains(e.LegacyId))
-                .ToList();
-        }
+            if (legacyIds.Count > 0)
+            {
+                var existingRecords = await ctx.ApsSnapshots.IgnoreQueryFilters().AsNoTracking()
+                    .Where(e => e.TenantId == ctx.TenantId)
+                    .Where(e => legacyIds.Contains(e.LegacyId!))
+                    .Select(e => new { e.LegacyId, IsSoftDeleted = e.DeletedAt != null })
+                    .ToListAsync(ct);
 
-        if (entities.Count == 0)
-            return [];
+                var existingSet = existingRecords.Select(r => r.LegacyId).ToHashSet();
+                var softDeletedCount = existingRecords.Count(r => r.IsSoftDeleted);
 
-        const int batchSize = 500;
-        foreach (var batch in entities.Chunk(batchSize))
-        {
-            _context.ApsSnapshots.AddRange(batch);
-            await _context.SaveChangesAsync(ct);
-            _context.ChangeTracker.Clear();
-        }
+                if (softDeletedCount > 0)
+                    _logger.LogInformation(
+                        "Skipped {Count} previously-deleted {Type} records during import",
+                        softDeletedCount, "ApsSnapshot");
 
-        return entities.Select(ApsSnapshotMapper.ToDomainModel);
+                entities = entities
+                    .Where(e => string.IsNullOrEmpty(e.LegacyId) || !existingSet.Contains(e.LegacyId))
+                    .ToList();
+            }
+
+            if (entities.Count == 0)
+            {
+                await tx.CommitAsync(ct);
+                return [];
+            }
+
+            const int batchSize = 500;
+            foreach (var batch in entities.Chunk(batchSize))
+            {
+                ctx.ApsSnapshots.AddRange(batch);
+                await ctx.SaveChangesAsync(ct);
+                ctx.ChangeTracker.Clear();
+            }
+
+            await tx.CommitAsync(ct);
+            return entities.Select(ApsSnapshotMapper.ToDomainModel);
+        });
     }
 }

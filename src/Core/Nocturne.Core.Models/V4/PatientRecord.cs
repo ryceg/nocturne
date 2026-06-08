@@ -56,6 +56,15 @@ public class PatientRecord
     public string? AvatarUrl { get; set; }
 
     /// <summary>
+    /// IANA timezone id (e.g. <c>Australia/Sydney</c>) the patient lives in. Drives wall-clock
+    /// interpretation across alerts (time-of-day windows, DND schedules), analytics, and the
+    /// glucose-bucket schedule resolver. Source of truth — supersedes the per-profile
+    /// <see cref="TherapySettings.Timezone"/> which was structurally the wrong home (a single
+    /// human can't be in two timezones simultaneously even if they have multiple profiles).
+    /// </summary>
+    public string? Timezone { get; set; }
+
+    /// <summary>
     /// When this record was first created (UTC).
     /// </summary>
     public DateTime CreatedAt { get; set; }

@@ -8,6 +8,7 @@ export { deleteAll, updateStatus } from './coachMarks.generated.remote';
 // './insulinCatalogs.generated.remote' - all exports collide, import directly
 export { getTenants, getTransitionStatus } from './platforms.generated.remote';
 export { validateUsername, ownerOptions, ownerComplete, ownerOidc } from './setups.generated.remote';
+// './basalInjections.generated.remote' - all exports collide, import directly
 // './bolusCalculations.generated.remote' - all exports collide, import directly
 // './bolus.generated.remote' - all exports collide, import directly
 export * from './foods.generated.remote';
@@ -22,28 +23,32 @@ export { getConfigManaged, enable, disable, testExisting, testUnsaved } from './
 export * from './glucoseProcessingSettings.generated.remote';
 export * from './profiles.generated.remote';
 export * from './userPreferences.generated.remote';
+export { approve, deny } from './accessRequests.generated.remote';
+export * from './connectorAdmins.generated.remote';
+export { upsert } from './platformSettings.generated.remote';
+export { addMember, removeMember, listInvites, provision, getMemberCredentials, attachOidcIdentity, removePasskeyCredential, removeOidcIdentity } from './tenants.generated.remote';
 export * from './services.generated.remote';
 // './status.generated.remote' - all exports collide, import directly
 export * from './supports.generated.remote';
 export * from './systems.generated.remote';
-export * from './accessRequests.generated.remote';
-export { addMember, removeMember, listInvites, provision, getMemberCredentials, attachOidcIdentity, removePasskeyCredential, removeOidcIdentity } from './tenants.generated.remote';
 export * from './alertCustomSounds.generated.remote';
 export { validateInvite, redeemInvite } from './alertInvites.generated.remote';
 export * from './alertReplays.generated.remote';
 export * from './alertRules.generated.remote';
 export * from './alerts.generated.remote';
 export * from './notifications.generated.remote';
-export { get } from './tenantAlertSettings.generated.remote';
+// './tenantAlertSettings.generated.remote' - all exports collide, import directly
 export * from './trackers.generated.remote';
 export * from './chatIdentities.generated.remote';
 // './connectedApps.generated.remote' - all exports collide, import directly
 export * from './guestLinks.generated.remote';
 export * from './linkedPlatforms.generated.remote';
 export * from './memberInvites.generated.remote';
+export { createRequest, getMyRequest, approveRequest, denyRequest, getMembershipRequestSettings, setMembershipRequestSettings } from './membershipRequests.generated.remote';
 export * from './myPermissions.generated.remote';
 export { getMyTenants, validateSlug } from './myTenants.generated.remote';
 export * from './roles.generated.remote';
+export * from './shareLinks.generated.remote';
 export * from './activities.generated.remote';
 export { getBodyWeights, getBodyWeight, updateBodyWeight, deleteBodyWeight } from './bodyWeights.generated.remote';
 export * from './heartRates.generated.remote';

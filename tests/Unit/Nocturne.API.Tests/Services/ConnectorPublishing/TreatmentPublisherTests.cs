@@ -4,9 +4,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Nocturne.API.Services.ConnectorPublishing;
+using Nocturne.Core.Contracts.Profiles.Resolvers;
 using Nocturne.Core.Contracts.Treatments;
 using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models;
+using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data;
 using Xunit;
 
@@ -21,6 +23,8 @@ public class TreatmentPublisherTests
     private readonly Mock<IBGCheckRepository> _mockBGCheckRepository;
     private readonly Mock<IBolusCalculationRepository> _mockBolusCalculationRepository;
     private readonly Mock<ITempBasalRepository> _mockTempBasalRepository;
+    private readonly Mock<IBasalRateResolver> _mockBasalRateResolver;
+    private readonly Mock<ITherapySettingsResolver> _mockTherapySettingsResolver;
     private readonly TreatmentPublisher _publisher;
 
     public TreatmentPublisherTests()
@@ -31,6 +35,16 @@ public class TreatmentPublisherTests
         _mockBGCheckRepository = new Mock<IBGCheckRepository>();
         _mockBolusCalculationRepository = new Mock<IBolusCalculationRepository>();
         _mockTempBasalRepository = new Mock<ITempBasalRepository>();
+        _mockBasalRateResolver = new Mock<IBasalRateResolver>();
+        _mockTherapySettingsResolver = new Mock<ITherapySettingsResolver>();
+
+        // Default: resolver returns a constant 1.0 U/hr. Individual tests override as needed.
+        _mockBasalRateResolver
+            .Setup(r => r.BuildResolverAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Func<long, double>)(_ => 1.0));
+        _mockTherapySettingsResolver
+            .Setup(r => r.HasDataAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var dbOptions = new DbContextOptionsBuilder<NocturneDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -45,6 +59,8 @@ public class TreatmentPublisherTests
             _mockBGCheckRepository.Object,
             _mockBolusCalculationRepository.Object,
             _mockTempBasalRepository.Object,
+            _mockBasalRateResolver.Object,
+            _mockTherapySettingsResolver.Object,
             NullLogger<TreatmentPublisher>.Instance
         );
     }
@@ -118,5 +134,168 @@ public class TreatmentPublisherTests
         var result = await _publisher.GetLatestTreatmentTimestampAsync("test-source");
 
         result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PublishTempBasalsAsync_ReclassifiesScheduledToAlgorithm_WhenRateDiffersFromProgrammed()
+    {
+        // Programmed schedule is a steady 1.0 U/hr, but the pump delivered 0.4 (low-temp).
+        // A connector that flattens algorithmic adjustments emits these as Scheduled.
+        _mockBasalRateResolver
+            .Setup(r => r.BuildResolverAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Func<long, double>)(_ => 1.0));
+
+        var startTs = new DateTime(2026, 5, 14, 12, 0, 0, DateTimeKind.Utc);
+        var records = new List<TempBasal>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                StartTimestamp = startTs,
+                EndTimestamp = startTs.AddMinutes(5),
+                Rate = 0.4,
+                ScheduledRate = 0.4, // connector copied Rate into ScheduledRate
+                Origin = TempBasalOrigin.Scheduled,
+                DataSource = "glooko-connector",
+            }
+        };
+
+        var result = await _publisher.PublishTempBasalsAsync(records, "glooko-connector");
+
+        result.Should().BeTrue();
+        records[0].Origin.Should().Be(TempBasalOrigin.Algorithm);
+        records[0].ScheduledRate.Should().Be(1.0);
+        records[0].Rate.Should().Be(0.4);
+        _mockTempBasalRepository.Verify(
+            r => r.BulkCreateAsync(records, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task PublishTempBasalsAsync_KeepsScheduledOrigin_WhenRateMatchesProgrammed()
+    {
+        _mockBasalRateResolver
+            .Setup(r => r.BuildResolverAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Func<long, double>)(_ => 1.0));
+
+        var records = new List<TempBasal>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                StartTimestamp = new DateTime(2026, 5, 14, 12, 0, 0, DateTimeKind.Utc),
+                Rate = 1.0,
+                ScheduledRate = 1.0,
+                Origin = TempBasalOrigin.Scheduled,
+                DataSource = "glooko-connector",
+            }
+        };
+
+        var result = await _publisher.PublishTempBasalsAsync(records, "glooko-connector");
+
+        result.Should().BeTrue();
+        records[0].Origin.Should().Be(TempBasalOrigin.Scheduled);
+        records[0].ScheduledRate.Should().Be(1.0);
+    }
+
+    [Fact]
+    public async Task PublishTempBasalsAsync_DoesNotReclassify_WithinFloatingPointTolerance()
+    {
+        // 0.025 U/hr is the typical pump rate increment. Below that should not trigger reclassification.
+        _mockBasalRateResolver
+            .Setup(r => r.BuildResolverAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Func<long, double>)(_ => 1.0));
+
+        var records = new List<TempBasal>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                StartTimestamp = new DateTime(2026, 5, 14, 12, 0, 0, DateTimeKind.Utc),
+                Rate = 1.0 + 1e-6, // pure floating-point noise
+                ScheduledRate = 1.0,
+                Origin = TempBasalOrigin.Scheduled,
+                DataSource = "glooko-connector",
+            }
+        };
+
+        var result = await _publisher.PublishTempBasalsAsync(records, "glooko-connector");
+
+        result.Should().BeTrue();
+        records[0].Origin.Should().Be(TempBasalOrigin.Scheduled);
+    }
+
+    [Fact]
+    public async Task PublishTempBasalsAsync_DoesNotTouchAlreadyAlgorithmOrManualOrigins()
+    {
+        _mockBasalRateResolver
+            .Setup(r => r.BuildResolverAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Func<long, double>)(_ => 1.0));
+
+        var ts = new DateTime(2026, 5, 14, 12, 0, 0, DateTimeKind.Utc);
+        var records = new List<TempBasal>
+        {
+            new() { Id = Guid.NewGuid(), StartTimestamp = ts, Rate = 0.5, ScheduledRate = 1.0, Origin = TempBasalOrigin.Algorithm },
+            new() { Id = Guid.NewGuid(), StartTimestamp = ts.AddMinutes(5), Rate = 0.5, ScheduledRate = 1.0, Origin = TempBasalOrigin.Manual },
+            new() { Id = Guid.NewGuid(), StartTimestamp = ts.AddMinutes(10), Rate = 0, ScheduledRate = null, Origin = TempBasalOrigin.Suspended },
+        };
+
+        var result = await _publisher.PublishTempBasalsAsync(records, "loop-connector");
+
+        result.Should().BeTrue();
+        records[0].Origin.Should().Be(TempBasalOrigin.Algorithm);
+        records[0].ScheduledRate.Should().Be(1.0); // untouched
+        records[1].Origin.Should().Be(TempBasalOrigin.Manual);
+        records[1].ScheduledRate.Should().Be(1.0); // untouched
+        records[2].Origin.Should().Be(TempBasalOrigin.Suspended);
+        records[2].ScheduledRate.Should().BeNull(); // untouched
+    }
+
+    [Fact]
+    public async Task PublishTempBasalsAsync_SkipsReclassification_WhenNoTherapyData()
+    {
+        // First-sync scenario: no basal_schedules on file yet, so we can't determine what was
+        // programmed. Leave records as-is rather than mass-reclassifying against the fallback default.
+        _mockTherapySettingsResolver
+            .Setup(r => r.HasDataAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var records = new List<TempBasal>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                StartTimestamp = new DateTime(2026, 5, 14, 12, 0, 0, DateTimeKind.Utc),
+                Rate = 0.4,
+                ScheduledRate = 0.4,
+                Origin = TempBasalOrigin.Scheduled,
+            }
+        };
+
+        var result = await _publisher.PublishTempBasalsAsync(records, "glooko-connector");
+
+        result.Should().BeTrue();
+        records[0].Origin.Should().Be(TempBasalOrigin.Scheduled);
+        records[0].ScheduledRate.Should().Be(0.4); // untouched
+        _mockBasalRateResolver.Verify(
+            r => r.BuildResolverAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task PublishTempBasalsAsync_NoOpResolverCall_WhenNoScheduledRecords()
+    {
+        var ts = new DateTime(2026, 5, 14, 12, 0, 0, DateTimeKind.Utc);
+        var records = new List<TempBasal>
+        {
+            new() { Id = Guid.NewGuid(), StartTimestamp = ts, Rate = 0.5, Origin = TempBasalOrigin.Algorithm },
+        };
+
+        var result = await _publisher.PublishTempBasalsAsync(records, "loop-connector");
+
+        result.Should().BeTrue();
+        _mockBasalRateResolver.Verify(
+            r => r.BuildResolverAsync(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

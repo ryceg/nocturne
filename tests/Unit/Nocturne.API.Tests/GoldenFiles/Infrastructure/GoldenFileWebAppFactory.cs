@@ -18,6 +18,7 @@ using Nocturne.Core.Models;
 using Nocturne.Core.Models.Authorization;
 using Nocturne.Core.Contracts.Audit;
 using Nocturne.Infrastructure.Cache.Abstractions;
+using Nocturne.Core.Contracts.Multitenancy;
 using Nocturne.Infrastructure.Data;
 using Nocturne.Infrastructure.Data.Services;
 
@@ -95,6 +96,14 @@ public class GoldenFileWebAppFactory : WebApplicationFactory<Program>
                     context.TenantId = tenantAccessor.TenantId;
                 }
                 return context;
+            });
+
+            // Register ITenantDbContextFactory (V4 repositories depend on this)
+            services.AddScoped<ITenantDbContextFactory>(sp =>
+            {
+                var factory = sp.GetRequiredService<IDbContextFactory<NocturneDbContext>>();
+                var tenantAccessor = sp.GetService<Nocturne.Core.Contracts.Multitenancy.ITenantAccessor>();
+                return new TestTenantDbContextFactory(factory, tenantAccessor);
             });
 
             // Create schema and seed all entities required by the middleware pipeline
@@ -211,5 +220,22 @@ public class TestAuthHandlerImpl : IAuthHandler
             Permissions = ["*"],
             Roles = ["admin"],
         }));
+    }
+}
+
+/// <summary>
+/// Test-only <see cref="ITenantDbContextFactory"/> that creates tenant-scoped contexts
+/// from the shared <see cref="IDbContextFactory{NocturneDbContext}"/> mock.
+/// </summary>
+file sealed class TestTenantDbContextFactory(
+    IDbContextFactory<NocturneDbContext> pool,
+    ITenantAccessor? tenantAccessor) : ITenantDbContextFactory
+{
+    public async ValueTask<NocturneDbContext> CreateAsync(CancellationToken ct = default)
+    {
+        var ctx = await pool.CreateDbContextAsync(ct);
+        if (tenantAccessor?.IsResolved == true)
+            ctx.TenantId = tenantAccessor.TenantId;
+        return ctx;
     }
 }

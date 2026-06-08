@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import ConnectorConfigForm from "./ConnectorConfigForm.svelte";
 
 const testSchema = {
+	type: "object",
 	properties: {
 		serverUrl: { type: "string", default: "" },
 		pollingInterval: {
@@ -44,6 +45,7 @@ describe("ConnectorConfigForm", () => {
 	it("renders boolean fields as switches", async () => {
 		// Use a schema where the boolean is NOT named "enabled" since that is filtered out
 		const boolSchema = {
+			type: "object",
 			properties: {
 				syncGlucose: { type: "boolean", default: true },
 			},

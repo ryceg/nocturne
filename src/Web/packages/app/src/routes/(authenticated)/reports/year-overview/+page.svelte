@@ -21,7 +21,7 @@
   import { getUnitLabel } from "$lib/utils/formatting";
   import { glucoseUnits } from "$lib/stores/appearance-store.svelte";
   import { getDateParamsContext } from "$lib/hooks/date-params.svelte";
-  import { untrack, tick } from "svelte";
+  import { onMount, untrack, tick } from "svelte";
   import { fade } from "svelte/transition";
 
   const reportsParams = getDateParamsContext();
@@ -433,16 +433,15 @@
   // Lifecycle
   // =========================================================================
 
-  $effect(() => {
-    if (browser && !metadataLoaded && !metadataLoading) {
-      loadMetadata();
-    }
-  });
-
-  $effect(() => {
-    if (metadataLoaded && sortedYears.length > 0) {
-      loadYearData(sortedYears[0]);
-    }
+  onMount(() => {
+    // `.run()` rejects when called during the render/effect flush, so defer the
+    // bootstrap to a microtask — onMount's synchronous body still counts as render.
+    queueMicrotask(async () => {
+      await loadMetadata();
+      if (sortedYears.length > 0) {
+        loadYearData(sortedYears[0]);
+      }
+    });
   });
 
   $effect(() => {
@@ -463,7 +462,7 @@
     const prevKey = [...prevDataSources].sort().join(",");
     if (currentKey !== prevKey && metadataLoaded) {
       prevDataSources = [...selectedDataSources];
-      clearAndReload();
+      queueMicrotask(() => clearAndReload());
     }
   });
 

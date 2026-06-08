@@ -15,6 +15,7 @@ internal sealed class TherapySettingsResolver : ITherapySettingsResolver
 {
     private readonly ITherapySettingsRepository _repo;
     private readonly IPatientInsulinRepository _insulinRepo;
+    private readonly IPatientRecordRepository _patientRecordRepo;
     private readonly IActiveProfileResolver _activeProfileResolver;
     private readonly ITenantAccessor _tenantAccessor;
     private readonly IMemoryCache _cache;
@@ -27,6 +28,7 @@ internal sealed class TherapySettingsResolver : ITherapySettingsResolver
     public TherapySettingsResolver(
         ITherapySettingsRepository repo,
         IPatientInsulinRepository insulinRepo,
+        IPatientRecordRepository patientRecordRepo,
         IActiveProfileResolver activeProfileResolver,
         ITenantAccessor tenantAccessor,
         IMemoryCache cache,
@@ -34,6 +36,7 @@ internal sealed class TherapySettingsResolver : ITherapySettingsResolver
     {
         _repo = repo;
         _insulinRepo = insulinRepo;
+        _patientRecordRepo = patientRecordRepo;
         _activeProfileResolver = activeProfileResolver;
         _tenantAccessor = tenantAccessor;
         _cache = cache;
@@ -79,7 +82,19 @@ internal sealed class TherapySettingsResolver : ITherapySettingsResolver
 
     public async Task<string?> GetTimezoneAsync(string? specProfile = null, CancellationToken ct = default)
     {
-        var profileName = specProfile ?? "Default";
+        // PatientRecord is the canonical source — a patient lives in one timezone regardless of
+        // how many therapy profiles they have. The per-profile TherapySettings.Timezone field
+        // remains a legacy fallback because connector-imported profiles (Nightscout, Glooko)
+        // wrote into it before this move; backfill brings those rows forward on next migration,
+        // but until then we read the legacy value rather than silently UTCing.
+        var patient = await _patientRecordRepo.GetAsync(ct);
+        if (!string.IsNullOrEmpty(patient?.Timezone))
+            return patient.Timezone;
+
+        var profileName = specProfile
+            ?? await _activeProfileResolver.GetActiveProfileNameAsync(
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), ct)
+            ?? "Default";
         var settings = await GetCachedSettingsAsync(profileName, DateTime.UtcNow, ct);
         return settings?.Timezone;
     }

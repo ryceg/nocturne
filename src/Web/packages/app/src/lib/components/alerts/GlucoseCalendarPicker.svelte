@@ -86,26 +86,31 @@
     return labels;
   });
 
-  // Derived promise of per-day entries keyed by YYYY-MM-DD. Re-fetches
-  // automatically when `viewMonth` changes; the template's {#await} block
-  // shows a loading badge until each new request resolves. `getPunchCardData`
-  // returns the same shape as the calendar page consumes, so we just project
-  // out the `entries` array per day.
+  // Per-day entries keyed by YYYY-MM-DD. Re-fetches automatically when
+  // `viewMonth` changes via the reactive QueryResult; cached months resolve
+  // synchronously from `.current` so re-opening the popover doesn't flicker
+  // through a loading state.
   type EntriesByDate = Record<string, { mills: number; mgdl: number }[]>;
-  const entriesPromise = $derived.by<Promise<EntriesByDate>>(() => {
-    const startDate = startOfMonth(viewMonth).toDate(tz);
-    const endDate = endOfMonth(viewMonth).toDate(tz);
-    return getPunchCardData({ startDate, endDate }).then((data) => {
-      const out: EntriesByDate = {};
-      for (const m of data?.months ?? []) {
-        for (const d of m.days ?? []) {
-          if (d.date && d.entries && d.entries.length > 0) {
-            out[d.date] = d.entries;
-          }
+  const punchCardQuery = $derived(
+    getPunchCardData({
+      startDate: startOfMonth(viewMonth).toDate(tz),
+      endDate: endOfMonth(viewMonth).toDate(tz),
+    })
+  );
+  const entriesByDate = $derived.by<EntriesByDate>(() => {
+    const data = punchCardQuery.current;
+    const out: EntriesByDate = {};
+    for (const m of data?.months ?? []) {
+      for (const d of m.days ?? []) {
+        if (d.date && d.entries && d.entries.length > 0) {
+          out[d.date] = d.entries.map((e) => ({
+            mills: e.mills ?? 0,
+            mgdl: e.mgdl ?? 0,
+          }));
         }
       }
-      return out;
-    });
+    }
+    return out;
   });
 
   function isFuture(d: DateValue): boolean {
@@ -143,27 +148,6 @@
   );
 </script>
 
-{#snippet grid(
-  entriesByDate: Record<string, { mills: number; mgdl: number }[]>
-)}
-  <div class="grid grid-cols-7 gap-1">
-    {#each gridDays as { date, inMonth } (dateKey(date))}
-      {@const entries = entriesByDate[dateKey(date)] ?? []}
-      {@const future = isFuture(date)}
-      <GlucosePickerCell
-        {date}
-        {entries}
-        {inMonth}
-        disabled={future}
-        selected={isSelected(date)}
-        isToday={isTodayCell(date)}
-        {locale}
-        onclick={() => pick(date)}
-      />
-    {/each}
-  </div>
-{/snippet}
-
 <div class="p-3 w-[480px]">
   <div class="flex items-center justify-between mb-2">
     <Button
@@ -177,11 +161,11 @@
     </Button>
     <div class="text-sm font-medium">
       {monthLabel}
-      {#await entriesPromise}
+      {#if punchCardQuery.loading}
         <span class="ml-2 text-xs text-muted-foreground font-normal">
           loading…
         </span>
-      {/await}
+      {/if}
     </div>
     <Button
       variant="ghost"
@@ -205,11 +189,20 @@
     {/each}
   </div>
 
-  {#await entriesPromise}
-    {@render grid({})}
-  {:then entriesByDate}
-    {@render grid(entriesByDate)}
-  {:catch}
-    {@render grid({})}
-  {/await}
+  <div class="grid grid-cols-7 gap-1">
+    {#each gridDays as { date, inMonth } (dateKey(date))}
+      {@const entries = entriesByDate[dateKey(date)] ?? []}
+      {@const future = isFuture(date)}
+      <GlucosePickerCell
+        {date}
+        {entries}
+        {inMonth}
+        disabled={future}
+        selected={isSelected(date)}
+        isToday={isTodayCell(date)}
+        {locale}
+        onclick={() => pick(date)}
+      />
+    {/each}
+  </div>
 </div>

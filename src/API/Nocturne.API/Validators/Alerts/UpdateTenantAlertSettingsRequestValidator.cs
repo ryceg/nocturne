@@ -8,7 +8,6 @@ namespace Nocturne.API.Validators.Alerts;
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
-/// <item><description>Timezone is required and capped at 64 characters (matches the column).</description></item>
 /// <item><description>When the schedule is enabled, both start and end must be set; cross-midnight
 /// windows are allowed so start &gt;= end is intentionally not rejected.</description></item>
 /// <item><description><c>DndManualUntil</c>, when present, must be in the future.</description></item>
@@ -19,8 +18,6 @@ public class UpdateTenantAlertSettingsRequestValidator
 {
     public UpdateTenantAlertSettingsRequestValidator()
     {
-        RuleFor(x => x.Timezone).NotEmpty().MaximumLength(64);
-
         RuleFor(x => x.DndScheduleStart).NotNull()
             .When(x => x.DndScheduleEnabled)
             .WithMessage("DndScheduleStart is required when DndScheduleEnabled is true");

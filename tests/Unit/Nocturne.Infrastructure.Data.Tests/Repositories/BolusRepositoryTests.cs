@@ -9,6 +9,7 @@ using Nocturne.Core.Contracts.Infrastructure;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Entities;
 using Nocturne.Infrastructure.Data.Repositories.V4;
+using Nocturne.Tests.Shared.Infrastructure;
 using Xunit;
 
 namespace Nocturne.Infrastructure.Data.Tests.Repositories;
@@ -69,7 +70,7 @@ public class BolusRepositoryTests : IDisposable
             .Returns(Task.CompletedTask);
 
         _repo = new BolusRepository(
-            _context,
+            new TestTenantDbContextFactory(_context),
             _mockDeduplicationService.Object,
             new Mock<IAuditContext>().Object,
             NullLogger<BolusRepository>.Instance);

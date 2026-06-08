@@ -21,7 +21,7 @@ public class UploaderSnapshotRepositoryBulkCreateTests : IDisposable
         var dbName = $"uploader_snapshot_bulk_tests_{Guid.NewGuid()}";
         _context = TestDbContextFactory.CreateInMemoryContext(dbName);
         _context.TenantId = TenantA;
-        _repository = new UploaderSnapshotRepository(_context, NullLogger<UploaderSnapshotRepository>.Instance);
+        _repository = new UploaderSnapshotRepository(new TestTenantDbContextFactory(_context), NullLogger<UploaderSnapshotRepository>.Instance);
     }
 
     public void Dispose()

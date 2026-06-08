@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Nocturne.Connectors.Core.Interfaces;
 using Nocturne.Connectors.Core.Models;
 using Nocturne.Connectors.Core.Services;
@@ -8,6 +7,7 @@ using Nocturne.Connectors.MyLife.Mappers;
 using Nocturne.Connectors.MyLife.Mappers.Constants;
 using Nocturne.Connectors.MyLife.Models;
 using Nocturne.Core.Constants;
+using Nocturne.Core.Contracts.Multitenancy;
 using Nocturne.Core.Models;
 using Nocturne.Core.Models.V4;
 
@@ -20,16 +20,16 @@ namespace Nocturne.Connectors.MyLife.Services;
 /// </summary>
 public class MyLifeConnectorService(
     HttpClient httpClient,
-    IOptions<MyLifeConnectorConfiguration> config,
+    IConnectorServerResolver<MyLifeConnectorConfiguration> serverResolver,
     ILogger<MyLifeConnectorService> logger,
     MyLifeAuthTokenProvider tokenProvider,
     MyLifeEventProcessor eventProcessor,
-    MyLifeSessionStore sessionStore,
+    IMyLifeSessionCache sessionCache,
+    ITenantAccessor tenantAccessor,
     MyLifeSyncService syncService,
     IConnectorPublisher? publisher = null
-) : BaseConnectorService<MyLifeConnectorConfiguration>(httpClient, logger, publisher)
+) : BaseConnectorService<MyLifeConnectorConfiguration>(httpClient, serverResolver, logger, publisher)
 {
-    private readonly MyLifeConnectorConfiguration _config = config.Value;
 
     public override string ServiceName => "MyLife";
     protected override string ConnectorSource => DataSources.MyLifeConnector;
@@ -50,18 +50,11 @@ public class MyLifeConnectorService(
     public override bool IsHealthy =>
         FailedRequestCount < MaxFailedRequestsBeforeUnhealthy && !tokenProvider.IsTokenExpired;
 
-    public override async Task<bool> AuthenticateAsync()
+    public override Task<bool> AuthenticateAsync()
     {
-        var token = await tokenProvider.GetValidTokenAsync();
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            sessionStore.Clear();
-            TrackFailedRequest("Token missing");
-            return false;
-        }
-
+        // Auth happens per-tenant inside PerformSyncInternalAsync where config is available
         TrackSuccessfulRequest();
-        return true;
+        return Task.FromResult(true);
     }
 
     /// <summary>
@@ -74,25 +67,36 @@ public class MyLifeConnectorService(
     }
 
     /// <summary>
+    /// Fetches pump settings readouts from MyLife. Returns an empty list when no valid session
+    /// is established.
+    /// </summary>
+    private async Task<IReadOnlyList<MyLifePumpSettingsReadout>> FetchPumpSettingsReadoutsAsync(
+        CancellationToken cancellationToken)
+    {
+        var session = sessionCache.Get(tenantAccessor.TenantId);
+        if (session == null
+            || string.IsNullOrWhiteSpace(session.ServiceUrl)
+            || string.IsNullOrWhiteSpace(session.AuthToken)
+            || string.IsNullOrWhiteSpace(session.PatientId))
+        {
+            return [];
+        }
+
+        return await syncService.FetchPumpSettingsAsync(
+            session.ServiceUrl,
+            session.AuthToken,
+            session.PatientId,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
     /// Fetches pump settings from MyLife and maps them to Profile records.
     /// </summary>
     public async Task<IEnumerable<Profile>> FetchPumpSettingsProfileAsync(
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(sessionStore.ServiceUrl)
-            || string.IsNullOrWhiteSpace(sessionStore.AuthToken)
-            || string.IsNullOrWhiteSpace(sessionStore.PatientId))
-        {
-            return [];
-        }
-
-        var readouts = await syncService.FetchPumpSettingsAsync(
-            sessionStore.ServiceUrl,
-            sessionStore.AuthToken,
-            sessionStore.PatientId,
-            cancellationToken
-        );
-
+        var readouts = await FetchPumpSettingsReadoutsAsync(cancellationToken);
         return MyLifePumpSettingsMapper.MapToProfiles(readouts);
     }
 
@@ -118,14 +122,25 @@ public class MyLifeConnectorService(
 
         try
         {
-            // Validate session
-            if (string.IsNullOrWhiteSpace(sessionStore.ServiceUrl)
-                || string.IsNullOrWhiteSpace(sessionStore.AuthToken)
-                || string.IsNullOrWhiteSpace(sessionStore.PatientId))
+            // Establish the MyLife session up front. AcquireTokenAsync (reached via the token
+            // provider) performs the SOAP login and populates the session cache as a side effect;
+            // the token is cached so subsequent cycles reuse it. Without this call the session cache
+            // is never populated and every sync fails with "session not established".
+            var token = await tokenProvider.GetValidTokenAsync(config, cancellationToken);
+
+            var session = sessionCache.Get(tenantAccessor.TenantId);
+            if (string.IsNullOrEmpty(token)
+                || session == null
+                || string.IsNullOrWhiteSpace(session.ServiceUrl)
+                || string.IsNullOrWhiteSpace(session.AuthToken)
+                || string.IsNullOrWhiteSpace(session.PatientId))
             {
                 result.Success = false;
-                result.Errors.Add("MyLife session not established");
+                result.Errors.Add("MyLife authentication failed; see connector logs for the failing step");
                 result.EndTime = DateTimeOffset.UtcNow;
+                _logger.LogWarning(
+                    "[{ConnectorSource}] Sync failed: MyLife authentication unsuccessful",
+                    ConnectorSource);
                 return result;
             }
 
@@ -143,9 +158,10 @@ public class MyLifeConnectorService(
             var needRecords = treatmentSubTypes.Any(t => activeTypes.Contains(t));
             var needStateSpans = activeTypes.Contains(SyncDataType.StateSpans);
 
-            // Calculate since timestamps
-            var glucoseSince = await CalculateSinceTimestampAsync(config, request.From);
-            var treatmentSince = await CalculateTreatmentSinceTimestampAsync(config, request.From);
+            // Calculate since timestamps. MyLife streams the source month by month, so it needs a
+            // concrete lower bound; fall back to the default initial window when no cursor exists.
+            var glucoseSince = await CalculateSinceTimestampAsync(config, request.From) ?? DefaultInitialSyncFloor();
+            var treatmentSince = await CalculateTreatmentSinceTimestampAsync(config, request.From) ?? DefaultInitialSyncFloor();
             var overallSince = glucoseSince < treatmentSince ? glucoseSince : treatmentSince;
             var until = request.To ?? DateTime.UtcNow;
 
@@ -160,9 +176,9 @@ public class MyLifeConnectorService(
 
             // Stream month by month
             await foreach (var batch in syncService.FetchEventsPerMonthAsync(
-                sessionStore.ServiceUrl,
-                sessionStore.AuthToken,
-                sessionStore.PatientId,
+                session.ServiceUrl,
+                session.AuthToken,
+                session.PatientId,
                 overallSince,
                 until,
                 cancellationToken))
@@ -258,12 +274,24 @@ public class MyLifeConnectorService(
                 UpdatePreviousTail(previousTail, batch.Events, overlapMs);
             }
 
-            // Publish Profile records from pump settings (separate SOAP call)
+            // Publish Profile records and active-profile state spans from pump settings
+            // (one SOAP call, two derived data shapes).
             if (activeTypes.Contains(SyncDataType.Profiles))
             {
-                var profiles = (await FetchPumpSettingsProfileAsync(cancellationToken)).ToList();
+                var readouts = await FetchPumpSettingsReadoutsAsync(cancellationToken);
+
+                var profiles = MyLifePumpSettingsMapper.MapToProfiles(readouts);
                 await PublishRecordTypeAsync(result, SyncDataType.Profiles, activeTypes,
                     profiles, PublishProfileDataAsync, config, cancellationToken);
+
+                var profileStateSpans = MyLifePumpSettingsMapper.MapToStateSpans(readouts, ConnectorSource);
+                if (profileStateSpans.Count > 0)
+                {
+                    await PublishStateSpanDataAsync(profileStateSpans, config, cancellationToken);
+                    _logger.LogInformation(
+                        "Published {Count} profile state spans from pump settings",
+                        profileStateSpans.Count);
+                }
             }
         }
         catch (Exception ex)

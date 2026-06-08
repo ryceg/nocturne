@@ -44,22 +44,6 @@ public class TenantEntity
     public DateTime? LastReadingAt { get; set; }
 
     /// <summary>
-    /// IANA timezone for this tenant (e.g. "America/New_York").
-    /// Used for schedule evaluation and display.
-    /// </summary>
-    [Column("timezone")]
-    [MaxLength(64)]
-    public string Timezone { get; set; } = "UTC";
-
-    /// <summary>
-    /// Preferred name for the person being monitored (e.g. "Alex").
-    /// Used in alert payloads. Falls back to DisplayName if null.
-    /// </summary>
-    [Column("subject_name")]
-    [MaxLength(128)]
-    public string? SubjectName { get; set; }
-
-    /// <summary>
     /// Whether unauthenticated users can request access to this tenant.
     /// </summary>
     [Column("allow_access_requests")]
@@ -70,6 +54,27 @@ public class TenantEntity
     /// </summary>
     [Column("onboarding_completed_at")]
     public DateTime? OnboardingCompletedAt { get; set; }
+
+    /// <summary>Whether this tenant is a demo instance with synthetic data.</summary>
+    [Column("is_demo")]
+    public bool IsDemo { get; set; }
+
+    /// <summary>
+    /// Unguessable token for the tenant's public read-only dashboard, served at
+    /// {token}.share.{baseDomain}. Null when public sharing is disabled. Rotating replaces the
+    /// value and evicts the resolution cache, so the previous link stops resolving.
+    /// </summary>
+    [Column("share_token")]
+    [MaxLength(32)]
+    public string? ShareToken { get; set; }
+
+    /// <summary>When <see cref="ShareToken"/> was last minted or rotated.</summary>
+    [Column("share_token_set_at")]
+    public DateTime? ShareTokenSetAt { get; set; }
+
+    /// <summary>When the public share link was last accessed. Drives the owner's rotate signal.</summary>
+    [Column("share_last_accessed_at")]
+    public DateTime? ShareLastAccessedAt { get; set; }
 
     /// <summary>
     /// When the tenant record was created
@@ -87,4 +92,9 @@ public class TenantEntity
     /// Collection of members belonging to this tenant
     /// </summary>
     public ICollection<TenantMemberEntity> Members { get; set; } = [];
+
+    /// <summary>
+    /// Demo configuration (null for non-demo tenants).
+    /// </summary>
+    public TenantDemoConfigEntity? DemoConfig { get; set; }
 }

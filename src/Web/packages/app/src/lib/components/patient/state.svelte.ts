@@ -23,7 +23,13 @@ const ClinicalFieldsSchema = z.object({
   dateOfBirth: z.string().optional(),
   preferredName: z.string().optional(),
   pronouns: z.string().optional(),
+  timezone: z.string().optional(),
 });
+
+const browserTimezone =
+  typeof Intl !== "undefined"
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : "";
 
 /** Reactive clinical form state bound to the patient record API */
 export class ClinicalState {
@@ -33,6 +39,9 @@ export class ClinicalState {
   dateOfBirth = $state("");
   preferredName = $state("");
   pronouns = $state("");
+  timezone = $state("");
+  /** True when the server has no timezone and we've pre-filled the field from the browser — used to surface a hint to confirm. */
+  timezoneAutoDetected = $state(false);
 
   readonly #record = patientRemote.getPatientRecord();
   readonly form = patientRemote.updatePatientRecord;
@@ -52,6 +61,16 @@ export class ClinicalState {
         this.dateOfBirth = toDateInput(r.dateOfBirth);
         this.preferredName = r.preferredName ?? "";
         this.pronouns = r.pronouns ?? "";
+        if (r.timezone) {
+          this.timezone = r.timezone;
+          this.timezoneAutoDetected = false;
+        } else {
+          // Pre-fill the browser tz so the user just needs to confirm. Alerts with
+          // time-of-day windows fall back to UTC without this — typically the wrong
+          // wall-clock for anyone outside UTC.
+          this.timezone = browserTimezone;
+          this.timezoneAutoDetected = !!browserTimezone;
+        }
       }
     });
 
@@ -69,6 +88,10 @@ export class ClinicalState {
           dateOfBirth: toDateInput(r.dateOfBirth),
           preferredName: r.preferredName ?? "",
           pronouns: r.pronouns ?? "",
+          // Initial reflects the *server* value, NOT the pre-filled browser tz. Diverging
+          // from `values` here is intentional: it makes the form dirty when the field is
+          // auto-populated, so the Save button enables and the user is nudged to commit.
+          timezone: r.timezone ?? "",
         };
       },
       values: () => ({
@@ -78,6 +101,7 @@ export class ClinicalState {
         dateOfBirth: this.dateOfBirth,
         preferredName: this.preferredName,
         pronouns: this.pronouns,
+        timezone: this.timezone,
       }),
       navBlockMessage: "You have unsaved changes. Leave anyway?",
       onreset: (snapshot) => {
@@ -87,6 +111,8 @@ export class ClinicalState {
         this.dateOfBirth = snapshot.dateOfBirth ?? "";
         this.preferredName = snapshot.preferredName ?? "";
         this.pronouns = snapshot.pronouns ?? "";
+        this.timezone = snapshot.timezone ?? "";
+        this.timezoneAutoDetected = false;
       },
     });
   }

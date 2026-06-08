@@ -1,5 +1,12 @@
 import { untrack } from "svelte";
-import { type BasalPoint, BasalDeliveryOrigin } from "$lib/api";
+import {
+  type BasalPoint,
+  BasalDeliveryOrigin,
+  type DeviceEventType,
+  type SystemEventType,
+  type StateSpanCategory,
+  type TrackerCategory,
+} from "$lib/api";
 import { STALE_THRESHOLD_MS } from "$lib/constants/staleness";
 import { getRealtimeStore } from "$lib/stores/realtime-store.svelte";
 import { getChartData } from "$api/chart-data.remote";
@@ -11,7 +18,6 @@ import {
 import {
   predictionMinutes,
   predictionEnabled,
-  predictionDisplayMode,
   glucoseChartLookback,
   GLUCOSE_CHART_FETCH_HOURS,
 } from "$lib/stores/appearance-store.svelte";
@@ -42,6 +48,7 @@ export interface BolusMarkerData {
   time: Date;
   insulin?: number;
   bolusType?: string;
+  isOverride?: boolean;
   treatmentId?: string;
   dataSource?: string;
   [key: string]: unknown;
@@ -60,7 +67,7 @@ export interface CarbMarkerData {
 /** A device event marker from the chart data */
 export interface DeviceEventMarkerData {
   time: Date;
-  eventType?: string;
+  eventType?: DeviceEventType;
   color: string;
   treatmentId?: string;
   [key: string]: unknown;
@@ -70,16 +77,32 @@ export interface DeviceEventMarkerData {
 export interface SystemEventMarkerData {
   time: Date;
   id?: string;
-  eventType?: string;
+  eventType?: SystemEventType;
   color: string;
   [key: string]: unknown;
+}
+
+/** A basal injection marker from the chart data */
+export interface BasalInjectionMarkerData {
+  time: Date;
+  id: string;
+  units: number;
+  insulinName?: string | null;
+}
+
+/** A BG check (fingerprick) marker from the chart data */
+export interface BgCheckMarkerData {
+  time: Date;
+  glucose: number;
+  glucoseType?: string | null;
+  treatmentId?: string | null;
 }
 
 /** A tracker expiration marker */
 export interface TrackerMarkerData {
   time: Date;
   id?: string;
-  category?: string;
+  category?: TrackerCategory;
   color: string;
   [key: string]: unknown;
 }
@@ -87,7 +110,7 @@ export interface TrackerMarkerData {
 /** A state span (pump mode, override, profile, activity, temp basal, basal delivery) */
 export interface StateSpan {
   id?: string;
-  category?: string;
+  category?: StateSpanCategory;
   state?: string;
   startTime: Date;
   endTime: Date | null;
@@ -206,6 +229,8 @@ export interface ChartDataEngine {
   readonly bolusMarkers: BolusMarkerData[];
   readonly carbMarkers: CarbMarkerData[];
   readonly deviceEventMarkers: DeviceEventMarkerData[];
+  readonly basalInjectionMarkers: BasalInjectionMarkerData[];
+  readonly bgCheckMarkers: BgCheckMarkerData[];
   readonly iobData: SeriesPoint[];
   readonly cobData: SeriesPoint[];
   readonly basalData: BasalPoint[];
@@ -292,7 +317,7 @@ export function createChartDataEngine(
 
   const effectiveShowPredictions = $derived(
     (options.enablePredictions ?? true) &&
-      (predictionServiceAvailable || hasExternalPredictions)
+    (predictionServiceAvailable || hasExternalPredictions)
   );
 
   const fullDataRange = $derived({
@@ -317,9 +342,9 @@ export function createChartDataEngine(
     from: displayDateRange.from,
     to: effectiveShowPredictions
       ? new Date(
-          displayDateRange.to.getTime() +
-            predictionMinutes.current * 60 * 1000
-        )
+        displayDateRange.to.getTime() +
+        predictionMinutes.current * 60 * 1000
+      )
       : displayDateRange.to,
   });
 
@@ -330,8 +355,8 @@ export function createChartDataEngine(
     to:
       effectiveShowPredictions && predictionData
         ? new Date(
-            fullDataRange.to.getTime() + predictionHours * 60 * 60 * 1000
-          )
+          fullDataRange.to.getTime() + predictionHours * 60 * 60 * 1000
+        )
         : fullDataRange.to,
   });
 
@@ -497,6 +522,10 @@ export function createChartDataEngine(
   });
 
   // ---- Glucose data (merged with realtime) ----
+  // Dedupe by timestamp: server data wins on collision, realtime fills gaps.
+  // A keyed {#each} downstream requires a unique key per point, so the same
+  // mills value must never appear twice — even if base or realtimeStore
+  // emit duplicates.
   const glucoseData = $derived.by(() => {
     const base = serverChartData?.glucoseData ?? [];
     if (!serverChartData) return base as GlucosePoint[];
@@ -504,29 +533,31 @@ export function createChartDataEngine(
     const thresholds = serverChartData.thresholds;
     const fromMs = fullDataRange.from.getTime();
     const toMs = fullDataRange.to.getTime();
-    const existingTimes = new Set(base.map((p) => p.time.getTime()));
 
-    const realtimePoints: GlucosePoint[] = realtimeStore.entries
-      .filter(
-        (e) =>
-          e.type === "sgv" &&
-          e.mills != null &&
-          e.sgv != null &&
-          e.mills >= fromMs &&
-          e.mills <= toMs &&
-          !existingTimes.has(e.mills)
-      )
-      .map((e) => ({
-        time: new Date(e.mills!),
-        sgv: e.sgv!,
+    const byMills = new Map<number, GlucosePoint>();
+    for (const p of base) byMills.set(p.time.getTime(), p);
+
+    for (const e of realtimeStore.entries) {
+      if (
+        e.type !== "sgv" ||
+        e.mills == null ||
+        e.sgv == null ||
+        e.mills < fromMs ||
+        e.mills > toMs ||
+        byMills.has(e.mills)
+      ) {
+        continue;
+      }
+      byMills.set(e.mills, {
+        time: new Date(e.mills),
+        sgv: e.sgv,
         direction: e.direction,
         dataSource: e.data_source,
-        color: getGlucoseColor(e.sgv!, thresholds),
-      }));
+        color: getGlucoseColor(e.sgv, thresholds),
+      });
+    }
 
-    if (realtimePoints.length === 0) return base as GlucosePoint[];
-
-    return [...base, ...realtimePoints].sort(
+    return [...byMills.values()].sort(
       (a, b) => a.time.getTime() - b.time.getTime()
     ) as GlucosePoint[];
   });
@@ -541,13 +572,19 @@ export function createChartDataEngine(
   const deviceEventMarkers = $derived(
     (serverChartData?.deviceEventMarkers ?? []) as DeviceEventMarkerData[]
   );
+  const basalInjectionMarkers = $derived(
+    (serverChartData?.basalInjectionMarkers ?? []) as BasalInjectionMarkerData[]
+  );
+  const bgCheckMarkers = $derived(
+    (serverChartData?.bgCheckMarkers ?? []) as BgCheckMarkerData[]
+  );
   const iobData = $derived(
     (serverChartData?.iobSeries ?? []) as SeriesPoint[]
   );
   const cobData = $derived(
     (serverChartData?.cobSeries ?? []) as SeriesPoint[]
   );
-  const basalData = $derived(serverChartData?.basalSeries ?? []);
+  const basalData = $derived((serverChartData?.basalSeries ?? []) as BasalPoint[]);
   const maxIOB = $derived(serverChartData?.maxIob ?? 3);
   const maxBasalRate = $derived(serverChartData?.maxBasalRate ?? 3.0);
 
@@ -681,8 +718,8 @@ export function createChartDataEngine(
     const rangeStart = displayDateRange.from.getTime();
     const predEnd = effectiveShowPredictions && predictionData
       ? new Date(
-          displayDateRange.to.getTime() + predictionHours * 60 * 60 * 1000
-        ).getTime()
+        displayDateRange.to.getTime() + predictionHours * 60 * 60 * 1000
+      ).getTime()
       : displayDateRange.to.getTime();
     return trackerMarkers
       .filter((m) => {
@@ -886,6 +923,8 @@ export function createChartDataEngine(
     get bolusMarkers() { return bolusMarkers; },
     get carbMarkers() { return carbMarkers; },
     get deviceEventMarkers() { return deviceEventMarkers; },
+    get basalInjectionMarkers() { return basalInjectionMarkers; },
+    get bgCheckMarkers() { return bgCheckMarkers; },
     get iobData() { return iobData; },
     get cobData() { return cobData; },
     get basalData() { return basalData; },

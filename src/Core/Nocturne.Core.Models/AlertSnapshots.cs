@@ -21,7 +21,8 @@ public record AlertRuleChannelSnapshot(
     Nocturne.Core.Models.Alerts.ChannelType ChannelType,
     string Destination,
     string? DestinationLabel,
-    int SortOrder);
+    int SortOrder,
+    string? Metadata = null);
 
 /// <summary>
 /// Immutable snapshot of a live alert instance.
@@ -40,7 +41,7 @@ public record CreateAlertInstanceRequest(Guid TenantId, Guid ExcursionId,
 /// <summary>
 /// Request to update an existing alert instance (snooze, status change).
 /// </summary>
-public record UpdateAlertInstanceRequest(Guid Id, string? Status = null,
+public record UpdateAlertInstanceRequest(Guid TenantId, Guid Id, string? Status = null,
     DateTime? SnoozedUntil = null, int? SnoozeCount = null);
 
 /// <summary>
@@ -88,19 +89,17 @@ public record SnoozedInstanceSnapshot(Guid InstanceId, Guid TenantId, Guid Alert
 /// <param name="DndScheduleEnabled">True when a recurring scheduled DND window is configured.</param>
 /// <param name="DndScheduleStart">Local-time start of the scheduled window.</param>
 /// <param name="DndScheduleEnd">Local-time end (cross-midnight allowed: start &gt; end interpreted as wrapping).</param>
-/// <param name="Timezone">IANA timezone (e.g. <c>Europe/London</c>) used to interpret the schedule.</param>
 public record TenantAlertSettingsSnapshot(
     bool DndManualActive,
     DateTime? DndManualUntil,
     DateTime? DndManualStartedAt,
     bool DndScheduleEnabled,
     TimeOnly? DndScheduleStart,
-    TimeOnly? DndScheduleEnd,
-    string Timezone)
+    TimeOnly? DndScheduleEnd)
 {
     /// <summary>An "everything off" snapshot used when no row exists for the tenant.</summary>
     public static TenantAlertSettingsSnapshot Empty { get; } =
-        new(false, null, null, false, null, null, "UTC");
+        new(false, null, null, false, null, null);
 
     /// <summary>
     /// The active DND projection produced by <see cref="Resolve"/>. <c>null</c> when DND is off.
@@ -111,10 +110,13 @@ public record TenantAlertSettingsSnapshot(
 
     /// <summary>
     /// Computes whether DND is currently active by either path (manual with optional auto-expire,
-    /// or scheduled window). The manual path takes precedence for the snapshot's <c>StartedAt</c>
-    /// anchor when both paths are active simultaneously. Returns <c>null</c> when DND is off.
+    /// or scheduled window). The scheduled window is interpreted in
+    /// <paramref name="timezoneId"/> (the patient's IANA timezone from
+    /// <see cref="V4.PatientRecord.Timezone"/>); null or unparseable falls back to UTC. The
+    /// manual path takes precedence for the snapshot's <c>StartedAt</c> anchor when both paths
+    /// are active simultaneously. Returns <c>null</c> when DND is off.
     /// </summary>
-    public ActiveProjection? Resolve(DateTime nowUtc)
+    public ActiveProjection? Resolve(DateTime nowUtc, string? timezoneId)
     {
         // Manual path
         var manualActive = DndManualActive
@@ -130,8 +132,15 @@ public record TenantAlertSettingsSnapshot(
         if (DndScheduleEnabled && DndScheduleStart is { } start && DndScheduleEnd is { } end)
         {
             TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById(Timezone); }
-            catch { tz = TimeZoneInfo.Utc; }
+            if (string.IsNullOrEmpty(timezoneId))
+            {
+                tz = TimeZoneInfo.Utc;
+            }
+            else
+            {
+                try { tz = TimeZoneInfo.FindSystemTimeZoneById(timezoneId); }
+                catch { tz = TimeZoneInfo.Utc; }
+            }
 
             var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
             var nowTime = TimeOnly.FromDateTime(localNow);

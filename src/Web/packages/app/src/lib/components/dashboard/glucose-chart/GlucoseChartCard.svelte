@@ -7,6 +7,7 @@
     CardTitle,
   } from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
+  import { IsMobile } from "$lib/hooks/is-mobile.svelte";
   import { getRealtimeStore } from "$lib/stores/realtime-store.svelte";
   import {
     predictionEnabled,
@@ -21,6 +22,7 @@
     chartAreaOpacity,
   } from "$lib/stores/appearance-store.svelte";
   import type { PredictionDisplayMode } from "$lib/stores/appearance-store.svelte";
+  import type { SystemEventType } from "$lib/api";
   import PredictionSettings from "../PredictionSettings.svelte";
   import MiniOverviewChart from "../MiniOverviewChart.svelte";
   import GlucoseChartShell from "./GlucoseChartShell.svelte";
@@ -53,6 +55,8 @@
   import GlucoseInspectionDialog from "./dialogs/GlucoseInspectionDialog.svelte";
   import DeliveryInspectionDialog from "./dialogs/DeliveryInspectionDialog.svelte";
   import TreatmentInspectionDialog from "./dialogs/TreatmentInspectionDialog.svelte";
+  import BasalInjectionMarkers from "./markers/BasalInjectionMarkers.svelte";
+  import BgCheckMarkers from "./markers/BgCheckMarkers.svelte";
 
   interface Props {
     dateRange?: { from: Date | string; to: Date | string };
@@ -79,6 +83,9 @@
   const realtimeStore = getRealtimeStore();
   const displayDemoMode = $derived(demoMode ?? realtimeStore.demoMode);
 
+  // On mobile, drop the card chrome so the chart can use the full width.
+  const isMobile = new IsMobile();
+
   // ===== ENGINE =====
   // svelte-ignore state_referenced_locally
   const engine = createChartDataEngine({
@@ -92,7 +99,6 @@
   });
 
   // ===== POINT INSPECTION =====
-  // svelte-ignore state_referenced_locally
   const inspection = createPointInspection(
     engine.finders,
     () => engine.glucoseData,
@@ -115,6 +121,7 @@
   let showOverrideSpans = $state(false);
   let showProfileSpans = $state(false);
   let showActivitySpans = $state(false);
+  let showBasalInjections = $state(true);
   let showPumpModes = $state(true);
   let expandedPumpModes = $state(false);
 
@@ -127,6 +134,7 @@
     get deviceEvents() { return showDeviceEvents; },
     get alarms() { return showAlarms; },
     get scheduledTrackers() { return showScheduledTrackers; },
+    get basalInjections() { return showBasalInjections; },
     get overrideSpans() { return showOverrideSpans; },
     get profileSpans() { return showProfileSpans; },
     get activitySpans() { return showActivitySpans; },
@@ -142,6 +150,7 @@
         case "deviceEvents": showDeviceEvents = !showDeviceEvents; break;
         case "alarms": showAlarms = !showAlarms; break;
         case "scheduledTrackers": showScheduledTrackers = !showScheduledTrackers; break;
+        case "basalInjections": showBasalInjections = !showBasalInjections; break;
         case "overrideSpans": showOverrideSpans = !showOverrideSpans; break;
         case "profileSpans": showProfileSpans = !showProfileSpans; break;
         case "activitySpans": showActivitySpans = !showActivitySpans; break;
@@ -199,6 +208,7 @@
 
   function findAllNearbyEntries(time: Date): EntryRecord[] {
     const nearby: EntryRecord[] = [];
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local, non-reactive
     const seen = new Set<string>();
     const allMarkers = [
       ...engine.bolusMarkers,
@@ -227,7 +237,8 @@
       realtimeStore.findEntryByTreatmentId(treatmentId) ?? null;
 
     if (!entry) {
-      const result = await getEntryByTreatmentId({ treatmentId });
+      const result = await getEntryByTreatmentId({ treatmentId }).run();
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- generated entry shape bridged to the app EntryRecord union
       entry = result as EntryRecord | null;
     }
 
@@ -298,10 +309,20 @@
       engine.displayDateRangeWithPredictions.to,
     ],
   );
+
+  const legendSystemEvents = $derived(
+    engine.displaySystemEvents.map(
+      (e): { id?: string; eventType?: SystemEventType; color?: string } => ({
+        id: e.id,
+        eventType: e.eventType,
+        color: e.color,
+      }),
+    ),
+  );
 </script>
 
-<Card class="@container bg-card border-border">
-  <CardHeader class="pb-2 px-3 @md:px-6">
+{#snippet chartBody()}
+  <CardHeader class={isMobile.current ? "pb-2 px-1" : "pb-2 px-3 @md:px-6"}>
     <div class="flex items-center justify-between flex-wrap gap-2">
       <CardTitle class="flex items-center gap-2 text-card-foreground">
         Blood Glucose
@@ -325,7 +346,7 @@
     </div>
   </CardHeader>
 
-  <CardContent class="p-1 @md:p-2">
+  <CardContent class={isMobile.current ? "-mx-2 p-0" : "p-1 @md:p-2"}>
     <ZoomIndicator {isZoomed} brushXDomain={brushDomain} onResetZoom={resetZoom} />
 
     <div class={heightClass ?? "h-80 @md:h-[450px]"}>
@@ -335,7 +356,7 @@
         {legend}
         brushDomain={brushDomain}
       >
-        {#snippet tracks(ctx)}
+        {#snippet tracks()}
           <BasalTrack />
           <SwimLaneTrack />
           <ThresholdRules />
@@ -355,9 +376,11 @@
           <DeviceEventMarkers onMarkerClick={handleMarkerClick} />
           <SystemEventMarkers />
           <TrackerMarkers />
+          <BasalInjectionMarkers />
+          <BgCheckMarkers />
           <ChartHighlight />
         {/snippet}
-        {#snippet overlays(_ctx)}
+        {#snippet overlays()}
           <ChartTooltip />
         {/snippet}
       </GlucoseChartShell>
@@ -407,7 +430,7 @@
       onToggleProfileSpans={() => legend.toggle("profileSpans")}
       onToggleActivitySpans={() => legend.toggle("activitySpans")}
       deviceEventMarkers={engine.deviceEventMarkers}
-      systemEvents={engine.displaySystemEvents}
+      systemEvents={legendSystemEvents}
       pumpModeSpans={engine.displayPumpModeSpans}
       scheduledTrackerMarkers={engine.displayTrackerMarkers}
       currentPumpMode={engine.currentPumpMode}
@@ -416,7 +439,17 @@
       onToggleExpandedPumpModes={() => (expandedPumpModes = !expandedPumpModes)}
     />
   </CardContent>
-</Card>
+{/snippet}
+
+{#if isMobile.current}
+  <div class="@container">
+    {@render chartBody()}
+  </div>
+{:else}
+  <Card class="@container bg-card border-border">
+    {@render chartBody()}
+  </Card>
+{/if}
 
 <!-- Entry Edit Dialog -->
 <EntryEditDialog

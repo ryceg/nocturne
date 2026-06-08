@@ -100,11 +100,13 @@ internal sealed class AlertDeliveryService(
 
         // Hand each persisted row to its provider. Provider failures are caught and recorded
         // on the delivery row; one bad webhook does not abort the rest of the batch.
-        foreach (var delivery in deliveryRows)
+        for (var i = 0; i < deliveryRows.Count; i++)
         {
+            var delivery = deliveryRows[i];
+            var channelMetadata = channels[i].Metadata;
             try
             {
-                await DispatchToProviderAsync(delivery, payload, ct);
+                await DispatchToProviderAsync(delivery, payload, channelMetadata, ct);
             }
             catch (Exception ex)
             {
@@ -208,11 +210,13 @@ internal sealed class AlertDeliveryService(
         }
         await db.SaveChangesAsync(ct);
 
-        foreach (var delivery in deliveryRows)
+        for (var i = 0; i < deliveryRows.Count; i++)
         {
+            var delivery = deliveryRows[i];
+            var channelMetadata = channels[i].Metadata;
             try
             {
-                await DispatchToProviderAsync(delivery, payload, ct);
+                await DispatchToProviderAsync(delivery, payload, channelMetadata, ct);
             }
             catch (Exception ex)
             {
@@ -250,7 +254,7 @@ internal sealed class AlertDeliveryService(
                     ChannelType = channel.ChannelType,
                     Destination = channel.Destination,
                 };
-                await DispatchToProviderAsync(fauxDelivery, payload, ct);
+                await DispatchToProviderAsync(fauxDelivery, payload, channel.Metadata, ct);
             }
             catch (Exception ex)
             {
@@ -286,7 +290,7 @@ internal sealed class AlertDeliveryService(
         await db.SaveChangesAsync(ct);
     }
 
-    private async Task DispatchToProviderAsync(AlertDeliveryEntity delivery, AlertPayload payload, CancellationToken ct)
+    private async Task DispatchToProviderAsync(AlertDeliveryEntity delivery, AlertPayload payload, string? channelMetadata, CancellationToken ct)
     {
         switch (delivery.ChannelType)
         {
@@ -322,6 +326,38 @@ internal sealed class AlertDeliveryService(
                 if (chatBotProvider is not null)
                 {
                     await chatBotProvider.SendAsync(delivery.Id, delivery.ChannelType, delivery.Destination, payload, ct);
+                }
+                break;
+
+            case ChannelType.HomeAssistant:
+                var haProvider = serviceProvider.GetService<Providers.HomeAssistantProvider>();
+                if (haProvider is not null)
+                {
+                    object? channelMeta = null;
+                    if (!string.IsNullOrEmpty(channelMetadata))
+                    {
+                        try
+                        {
+                            using var doc = System.Text.Json.JsonDocument.Parse(channelMetadata);
+                            var allowAck = doc.RootElement.TryGetProperty("allow_ack", out var prop)
+                                           && prop.ValueKind == System.Text.Json.JsonValueKind.True;
+                            channelMeta = new { allowAck };
+                        }
+                        catch (System.Text.Json.JsonException)
+                        {
+                            channelMeta = new { allowAck = false };
+                        }
+                    }
+                    else
+                    {
+                        channelMeta = new { allowAck = false };
+                    }
+
+                    var delivered = await haProvider.SendAsync(delivery.TenantId, delivery.Destination, payload, channelMeta, ct);
+                    if (delivered)
+                        await MarkDeliveredAsync(delivery.Id, null, null, ct);
+                    else
+                        await MarkFailedAsync(delivery.Id, "No Home Assistant instance connected", ct);
                 }
                 break;
 

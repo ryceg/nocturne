@@ -2,6 +2,8 @@ using System.Text.Json;
 using Nocturne.API.Helpers;
 using Nocturne.API.Services.ChartData;
 using Nocturne.Core.Contracts.Analytics;
+using Nocturne.Core.Contracts.Profiles.Resolvers;
+using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Entities;
@@ -24,8 +26,15 @@ namespace Nocturne.API.Services.Analytics;
 /// <seealso cref="ChartDataContext"/>
 public class ChartDataService : IChartDataService
 {
+    private const int TempBasalQueryLimit = 131072;
+
     private readonly IEnumerable<IChartDataStage> _pipeline;
     private readonly IChartDataAssembler _assembler;
+    private readonly IBasalSeriesBuilder _basalSeriesBuilder;
+    private readonly ITempBasalRepository _tempBasalRepository;
+    private readonly ITherapySettingsResolver _therapySettingsResolver;
+    private readonly IBasalRateResolver _basalRateResolver;
+    private readonly ITherapyTimelineResolver _therapyTimelineResolver;
     private readonly ILogger<ChartDataService> _logger;
 
     /// <summary>
@@ -33,15 +42,30 @@ public class ChartDataService : IChartDataService
     /// </summary>
     /// <param name="pipeline">The ordered sequence of <see cref="IChartDataStage"/> stages to execute.</param>
     /// <param name="assembler">The assembler that converts the completed context into the final DTO.</param>
+    /// <param name="basalSeriesBuilder">Builds basal delivery series from temp basals and profile rates.</param>
+    /// <param name="tempBasalRepository">Repository for fetching temp basal records.</param>
+    /// <param name="therapySettingsResolver">Resolves whether therapy settings (profile) data exists.</param>
+    /// <param name="basalRateResolver">Resolves the active basal rate at a point in time.</param>
+    /// <param name="therapyTimelineResolver">Builds the therapy timeline that <see cref="IBasalSeriesBuilder"/> consumes.</param>
     /// <param name="logger">The logger instance.</param>
     public ChartDataService(
         IEnumerable<IChartDataStage> pipeline,
         IChartDataAssembler assembler,
+        IBasalSeriesBuilder basalSeriesBuilder,
+        ITempBasalRepository tempBasalRepository,
+        ITherapySettingsResolver therapySettingsResolver,
+        IBasalRateResolver basalRateResolver,
+        ITherapyTimelineResolver therapyTimelineResolver,
         ILogger<ChartDataService> logger
     )
     {
         _pipeline = pipeline;
         _assembler = assembler;
+        _basalSeriesBuilder = basalSeriesBuilder;
+        _tempBasalRepository = tempBasalRepository;
+        _therapySettingsResolver = therapySettingsResolver;
+        _basalRateResolver = basalRateResolver;
+        _therapyTimelineResolver = therapyTimelineResolver;
         _logger = logger;
     }
 
@@ -68,6 +92,45 @@ public class ChartDataService : IChartDataService
         }
 
         return _assembler.Assemble(context);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<BasalPoint>> GetBasalSeriesAsync(
+        long startTime,
+        long endTime,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var defaultBasalRate = 1.0;
+        var hasData = await _therapySettingsResolver.HasDataAsync(cancellationToken);
+        if (hasData)
+            defaultBasalRate = await _basalRateResolver.GetBasalRateAsync(endTime, ct: cancellationToken);
+
+        var tempBasals = (await _tempBasalRepository.GetAsync(
+            from: DateTimeOffset.FromUnixTimeMilliseconds(startTime).UtcDateTime,
+            to: DateTimeOffset.FromUnixTimeMilliseconds(endTime).UtcDateTime,
+            device: null,
+            source: null,
+            limit: TempBasalQueryLimit,
+            offset: 0,
+            descending: false,
+            ct: cancellationToken
+        )).ToList();
+
+        var timeline = await _therapyTimelineResolver.BuildAsync(
+            startTime,
+            endTime + 1,
+            ct: cancellationToken
+        );
+
+        return await _basalSeriesBuilder.BuildAsync(
+            tempBasals,
+            startTime,
+            endTime,
+            defaultBasalRate,
+            timeline,
+            cancellationToken
+        );
     }
 
     #region Internal Helpers
@@ -192,7 +255,7 @@ public class ChartDataService : IChartDataService
         return tempBasals
             .Select(tb =>
             {
-                var origin = MapTempBasalOrigin(tb.Origin);
+                var origin = BasalSeriesBuilder.MapTempBasalOrigin(tb.Origin);
                 return new BasalDeliverySpanDto
                 {
                     Id = tb.LegacyId ?? tb.Id.ToString(),
@@ -226,21 +289,6 @@ public class ChartDataService : IChartDataService
             })
             .ToList();
     }
-
-    /// <summary>
-    /// Maps a TempBasalOrigin enum value to the corresponding BasalDeliveryOrigin enum value.
-    /// Both enums have identical members (Algorithm, Scheduled, Manual, Suspended, Inferred).
-    /// </summary>
-    internal static BasalDeliveryOrigin MapTempBasalOrigin(TempBasalOrigin origin) =>
-        origin switch
-        {
-            TempBasalOrigin.Algorithm => BasalDeliveryOrigin.Algorithm,
-            TempBasalOrigin.Scheduled => BasalDeliveryOrigin.Scheduled,
-            TempBasalOrigin.Manual => BasalDeliveryOrigin.Manual,
-            TempBasalOrigin.Suspended => BasalDeliveryOrigin.Suspended,
-            TempBasalOrigin.Inferred => BasalDeliveryOrigin.Inferred,
-            _ => BasalDeliveryOrigin.Scheduled,
-        };
 
     internal static List<SystemEventMarkerDto> MapSystemEvents(
         IEnumerable<SystemEvent>? systemEvents

@@ -16,13 +16,16 @@ export const getAll = query(z.object({ from: z.coerce.date().optional(), to: z.c
     return await apiClient.note.getAll(params?.from, params?.to, params?.limit, params?.offset, params?.sort, params?.device, params?.source);
   } catch (err) {
     const status = (err as any)?.status;
-    if (status === 401) { const { url } = getRequestEvent(); throw redirect(302, `/auth/login?returnUrl=${encodeURIComponent(url.pathname + url.search)}`); }
+    if (status === 401) { const { request, url } = getRequestEvent();
+    const shareHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '';
+    if (/^[^.]+\.share\./i.test(shareHost)) throw error(401, 'Unauthorized');
+    throw redirect(302, `/auth/login?returnUrl=${encodeURIComponent(url.pathname + url.search)}`); }
     if (status === 403) throw error(403, (err as any)?.message ?? (err as any)?.detail ?? 'Forbidden');
     console.error('Error in note.getAll:', err);
     const e = err as any;
     const body = e?.body ?? e?.response;
     const errors = body?.errors ?? e?.errors;
-    const flat = errors ? Object.entries(errors).map(([k, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
+    const flat = errors ? Object.entries(errors).map(([, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
     const message = flat ?? body?.message ?? body?.title ?? body?.detail ?? e?.message ?? e?.title ?? e?.detail;
     if (status === 400 || status === 409) throw error(status, message ?? 'Request rejected');
     throw error(500, message ?? 'Failed to get all');
@@ -43,7 +46,7 @@ export const create = form(formCoerce(UpsertNoteRequestSchema) as any, async (re
     const e = err as any;
     const body = e?.body ?? e?.response;
     const errors = body?.errors ?? e?.errors;
-    const flat = errors ? Object.entries(errors).map(([k, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
+    const flat = errors ? Object.entries(errors).map(([, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
     const message = flat ?? body?.message ?? body?.title ?? body?.detail ?? e?.message ?? e?.title ?? e?.detail;
     if (status === 400 || status === 409) throw error(status, message ?? 'Request rejected');
     throw error(500, message ?? 'Failed to create');
@@ -57,13 +60,16 @@ export const getById = query(z.string(), async (id) => {
     return await apiClient.note.getById(id);
   } catch (err) {
     const status = (err as any)?.status;
-    if (status === 401) { const { url } = getRequestEvent(); throw redirect(302, `/auth/login?returnUrl=${encodeURIComponent(url.pathname + url.search)}`); }
+    if (status === 401) { const { request, url } = getRequestEvent();
+    const shareHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '';
+    if (/^[^.]+\.share\./i.test(shareHost)) throw error(401, 'Unauthorized');
+    throw redirect(302, `/auth/login?returnUrl=${encodeURIComponent(url.pathname + url.search)}`); }
     if (status === 403) throw error(403, (err as any)?.message ?? (err as any)?.detail ?? 'Forbidden');
     console.error('Error in note.getById:', err);
     const e = err as any;
     const body = e?.body ?? e?.response;
     const errors = body?.errors ?? e?.errors;
-    const flat = errors ? Object.entries(errors).map(([k, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
+    const flat = errors ? Object.entries(errors).map(([, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
     const message = flat ?? body?.message ?? body?.title ?? body?.detail ?? e?.message ?? e?.title ?? e?.detail;
     if (status === 400 || status === 409) throw error(status, message ?? 'Request rejected');
     throw error(500, message ?? 'Failed to get by id');
@@ -84,7 +90,7 @@ export const update = form(formCoerce(z.object({ id: z.string(), request: Upsert
     const e = err as any;
     const body = e?.body ?? e?.response;
     const errors = body?.errors ?? e?.errors;
-    const flat = errors ? Object.entries(errors).map(([k, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
+    const flat = errors ? Object.entries(errors).map(([, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
     const message = flat ?? body?.message ?? body?.title ?? body?.detail ?? e?.message ?? e?.title ?? e?.detail;
     if (status === 400 || status === 409) throw error(status, message ?? 'Request rejected');
     throw error(500, message ?? 'Failed to update');
@@ -105,9 +111,74 @@ export const remove = command(z.string(), async (id) => {
     const e = err as any;
     const body = e?.body ?? e?.response;
     const errors = body?.errors ?? e?.errors;
-    const flat = errors ? Object.entries(errors).map(([k, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
+    const flat = errors ? Object.entries(errors).map(([, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
     const message = flat ?? body?.message ?? body?.title ?? body?.detail ?? e?.message ?? e?.title ?? e?.detail;
     if (status === 400 || status === 409) throw error(status, message ?? 'Request rejected');
     throw error(500, message ?? 'Failed to remove');
+  }
+});
+
+/** Lists soft-deleted records available for restoration, ordered by deletion date (newest first). */
+export const listDeleted = query(z.object({ limit: z.number().optional(), offset: z.number().optional() }).optional(), async (params) => {
+  const apiClient = getRequestEvent().locals.apiClient;
+  try {
+    return await apiClient.note.listDeleted(params?.limit, params?.offset);
+  } catch (err) {
+    const status = (err as any)?.status;
+    if (status === 401) { const { request, url } = getRequestEvent();
+    const shareHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '';
+    if (/^[^.]+\.share\./i.test(shareHost)) throw error(401, 'Unauthorized');
+    throw redirect(302, `/auth/login?returnUrl=${encodeURIComponent(url.pathname + url.search)}`); }
+    if (status === 403) throw error(403, (err as any)?.message ?? (err as any)?.detail ?? 'Forbidden');
+    console.error('Error in note.listDeleted:', err);
+    const e = err as any;
+    const body = e?.body ?? e?.response;
+    const errors = body?.errors ?? e?.errors;
+    const flat = errors ? Object.entries(errors).map(([, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
+    const message = flat ?? body?.message ?? body?.title ?? body?.detail ?? e?.message ?? e?.title ?? e?.detail;
+    if (status === 400 || status === 409) throw error(status, message ?? 'Request rejected');
+    throw error(500, message ?? 'Failed to list deleted');
+  }
+});
+
+/** Restores a soft-deleted record by ID. */
+export const restore = command(z.string(), async (id) => {
+  const apiClient = getRequestEvent().locals.apiClient;
+  try {
+    const result = await apiClient.note.restore(id);
+    return result;
+  } catch (err) {
+    const status = (err as any)?.status;
+    if (status === 401) { throw error(401, 'Unauthorized'); }
+    if (status === 403) throw error(403, (err as any)?.message ?? (err as any)?.detail ?? 'Forbidden');
+    console.error('Error in note.restore:', err);
+    const e = err as any;
+    const body = e?.body ?? e?.response;
+    const errors = body?.errors ?? e?.errors;
+    const flat = errors ? Object.entries(errors).map(([, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
+    const message = flat ?? body?.message ?? body?.title ?? body?.detail ?? e?.message ?? e?.title ?? e?.detail;
+    if (status === 400 || status === 409) throw error(status, message ?? 'Request rejected');
+    throw error(500, message ?? 'Failed to restore');
+  }
+});
+
+/** Restores multiple soft-deleted records by their IDs. */
+export const bulkRestore = command(async () => {
+  const apiClient = getRequestEvent().locals.apiClient;
+  try {
+    const result = await apiClient.note.bulkRestore();
+    return result;
+  } catch (err) {
+    const status = (err as any)?.status;
+    if (status === 401) { throw error(401, 'Unauthorized'); }
+    if (status === 403) throw error(403, (err as any)?.message ?? (err as any)?.detail ?? 'Forbidden');
+    console.error('Error in note.bulkRestore:', err);
+    const e = err as any;
+    const body = e?.body ?? e?.response;
+    const errors = body?.errors ?? e?.errors;
+    const flat = errors ? Object.entries(errors).map(([, v]: [string, any]) => Array.isArray(v) ? v.join(', ') : v).join('; ') : undefined;
+    const message = flat ?? body?.message ?? body?.title ?? body?.detail ?? e?.message ?? e?.title ?? e?.detail;
+    if (status === 400 || status === 409) throw error(status, message ?? 'Request rejected');
+    throw error(500, message ?? 'Failed to bulk restore');
   }
 });

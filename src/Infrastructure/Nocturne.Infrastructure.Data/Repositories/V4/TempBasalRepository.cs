@@ -7,6 +7,7 @@ using Nocturne.Core.Models;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Extensions;
 using Nocturne.Infrastructure.Data.Mappers.V4;
+using Nocturne.Infrastructure.Data.Services;
 
 namespace Nocturne.Infrastructure.Data.Repositories.V4;
 
@@ -16,7 +17,7 @@ namespace Nocturne.Infrastructure.Data.Repositories.V4;
 /// </summary>
 public class TempBasalRepository : ITempBasalRepository
 {
-    private readonly NocturneDbContext _context;
+    private readonly ITenantDbContextFactory _contextFactory;
     private readonly IDeduplicationService _deduplicationService;
     private readonly IAuditContext _auditContext;
     private readonly ILogger<TempBasalRepository> _logger;
@@ -24,17 +25,17 @@ public class TempBasalRepository : ITempBasalRepository
     /// <summary>
     /// Initializes a new instance of the <see cref="TempBasalRepository"/> class.
     /// </summary>
-    /// <param name="context">The database context.</param>
+    /// <param name="contextFactory">The tenant database context factory.</param>
     /// <param name="deduplicationService">The deduplication service.</param>
     /// <param name="auditContext">The audit context for tracking mutations.</param>
     /// <param name="logger">The logger instance.</param>
     public TempBasalRepository(
-        NocturneDbContext context,
+        ITenantDbContextFactory contextFactory,
         IDeduplicationService deduplicationService,
         IAuditContext auditContext,
         ILogger<TempBasalRepository> logger)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _deduplicationService = deduplicationService;
         _auditContext = auditContext;
         _logger = logger;
@@ -64,7 +65,8 @@ public class TempBasalRepository : ITempBasalRepository
         CancellationToken ct = default
     )
     {
-        var query = _context.TempBasals.AsNoTracking().AsQueryable();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.TempBasals.AsNoTracking().AsQueryable();
         if (from.HasValue)
             query = query.Where(e => e.StartTimestamp >= from.Value);
         if (to.HasValue)
@@ -75,7 +77,7 @@ public class TempBasalRepository : ITempBasalRepository
             query = query.Where(e => e.DataSource == source);
 
         // Exclude non-primary duplicates from cross-connector deduplication
-        query = query.Where(b => !_context.LinkedRecords
+        query = query.Where(b => !ctx.LinkedRecords
             .Any(lr => lr.RecordType == "tempbasal" && !lr.IsPrimary && lr.RecordId == b.Id));
 
         query = descending
@@ -93,7 +95,8 @@ public class TempBasalRepository : ITempBasalRepository
     /// <returns>The temporary basal record, or null if not found.</returns>
     public async Task<TempBasal?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var entity = await _context.TempBasals.FindAsync([id], ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.TempBasals.FindAsync([id], ct);
         return entity is null ? null : TempBasalMapper.ToDomainModel(entity);
     }
 
@@ -105,7 +108,8 @@ public class TempBasalRepository : ITempBasalRepository
     /// <returns>The temporary basal record, or null if not found.</returns>
     public async Task<TempBasal?> GetByLegacyIdAsync(string legacyId, CancellationToken ct = default)
     {
-        var entity = await _context.TempBasals.FirstOrDefaultAsync(e => e.LegacyId == legacyId, ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.TempBasals.FirstOrDefaultAsync(e => e.LegacyId == legacyId, ct);
         return entity is null ? null : TempBasalMapper.ToDomainModel(entity);
     }
 
@@ -117,9 +121,10 @@ public class TempBasalRepository : ITempBasalRepository
     /// <returns>The created temporary basal record.</returns>
     public async Task<TempBasal> CreateAsync(TempBasal model, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity = TempBasalMapper.ToEntity(model);
-        _context.TempBasals.Add(entity);
-        await _context.SaveChangesAsync(ct);
+        ctx.TempBasals.Add(entity);
+        await ctx.SaveChangesAsync(ct);
         return TempBasalMapper.ToDomainModel(entity);
     }
 
@@ -132,11 +137,12 @@ public class TempBasalRepository : ITempBasalRepository
     /// <returns>The updated temporary basal record.</returns>
     public async Task<TempBasal> UpdateAsync(Guid id, TempBasal model, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity =
-            await _context.TempBasals.FindAsync([id], ct)
+            await ctx.TempBasals.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"TempBasal {id} not found");
         TempBasalMapper.UpdateEntity(entity, model);
-        await _context.SaveChangesAsync(ct);
+        await ctx.SaveChangesAsync(ct);
         return TempBasalMapper.ToDomainModel(entity);
     }
 
@@ -147,11 +153,61 @@ public class TempBasalRepository : ITempBasalRepository
     /// <param name="ct">The cancellation token.</param>
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity =
-            await _context.TempBasals.FindAsync([id], ct)
+            await ctx.TempBasals.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"TempBasal {id} not found");
-        _context.TempBasals.Remove(entity);
-        await _context.SaveChangesAsync(ct);
+        entity.DeletedAt = DateTime.UtcNow;
+        await ctx.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<TempBasal> RestoreAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.TempBasals.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.Id == id && e.DeletedAt != null)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException($"Soft-deleted TempBasal {id} not found");
+        entity.DeletedAt = null;
+        await ctx.SaveChangesAsync(ct);
+        return TempBasalMapper.ToDomainModel(entity);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<TempBasal>> BulkRestoreAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var idSet = ids.ToHashSet();
+        var entities = await ctx.TempBasals.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && idSet.Contains(e.Id) && e.DeletedAt != null)
+            .ToListAsync(ct);
+        foreach (var entity in entities)
+            entity.DeletedAt = null;
+        await ctx.SaveChangesAsync(ct);
+        return entities.Select(TempBasalMapper.ToDomainModel);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<TempBasal>> GetDeletedAsync(int limit, int offset, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entities = await ctx.TempBasals.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.DeletedAt != null)
+            .OrderByDescending(e => e.DeletedAt)
+            .Skip(offset).Take(limit)
+            .AsNoTracking()
+            .ToListAsync(ct);
+        return entities.Select(TempBasalMapper.ToDomainModel);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountDeletedAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.TempBasals.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.DeletedAt != null)
+            .CountAsync(ct);
     }
 
     /// <summary>
@@ -162,8 +218,9 @@ public class TempBasalRepository : ITempBasalRepository
     /// <returns>The number of deleted records.</returns>
     public async Task<int> DeleteByLegacyIdAsync(string legacyId, CancellationToken ct = default)
     {
-        return await _context.AuditedExecuteDeleteAsync(
-            _context.TempBasals.Where(e => e.LegacyId == legacyId), _auditContext, ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.AuditedSoftDeleteAsync(
+            ctx.TempBasals.Where(e => e.LegacyId == legacyId), _auditContext, ct);
     }
 
     /// <summary>
@@ -175,7 +232,8 @@ public class TempBasalRepository : ITempBasalRepository
     /// <returns>The count of matching records.</returns>
     public async Task<int> CountAsync(DateTime? from, DateTime? to, CancellationToken ct = default)
     {
-        var query = _context.TempBasals.AsNoTracking().AsQueryable();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.TempBasals.AsNoTracking().AsQueryable();
         if (from.HasValue)
             query = query.Where(e => e.StartTimestamp >= from.Value);
         if (to.HasValue)
@@ -194,65 +252,86 @@ public class TempBasalRepository : ITempBasalRepository
         CancellationToken ct = default
     )
     {
-        var entities = records.Select(TempBasalMapper.ToEntity).ToList();
-        if (entities.Count == 0)
-            return [];
-
-        // Batch-level dedup: keep first occurrence per LegacyId
-        entities = entities
-            .GroupBy(e => e.LegacyId ?? e.Id.ToString())
-            .Select(g => g.First())
-            .ToList();
-
-        // DB-level dedup: filter out records whose LegacyId already exists
-        var legacyIds = entities
-            .Where(e => !string.IsNullOrEmpty(e.LegacyId))
-            .Select(e => e.LegacyId!)
-            .ToHashSet();
-
-        if (legacyIds.Count > 0)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var strategy = ctx.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var existingIds = await _context
-                .TempBasals.AsNoTracking()
-                .Where(e => legacyIds.Contains(e.LegacyId!))
-                .Select(e => e.LegacyId)
-                .ToListAsync(ct);
+            await using var tx = await ctx.Database.BeginTransactionAsync(ct);
+            var entities = records.Select(TempBasalMapper.ToEntity).ToList();
+            if (entities.Count == 0)
+            {
+                await tx.CommitAsync(ct);
+                return [];
+            }
 
-            var existingSet = existingIds.ToHashSet();
+            // Batch-level dedup: keep first occurrence per LegacyId
             entities = entities
-                .Where(e => string.IsNullOrEmpty(e.LegacyId) || !existingSet.Contains(e.LegacyId))
+                .GroupBy(e => e.LegacyId ?? e.Id.ToString())
+                .Select(g => g.First())
                 .ToList();
-        }
 
-        if (entities.Count == 0)
-            return [];
+            // DB-level dedup: filter out records whose LegacyId already exists
+            var legacyIds = entities
+                .Where(e => !string.IsNullOrEmpty(e.LegacyId))
+                .Select(e => e.LegacyId!)
+                .ToHashSet();
 
-        const int batchSize = 500;
-        foreach (var batch in entities.Chunk(batchSize))
-        {
-            _context.TempBasals.AddRange(batch);
-            await _context.SaveChangesAsync(ct);
-            _context.ChangeTracker.Clear();
-        }
+            if (legacyIds.Count > 0)
+            {
+                var existingRecords = await ctx.TempBasals.IgnoreQueryFilters().AsNoTracking()
+                    .Where(e => e.TenantId == ctx.TenantId)
+                    .Where(e => legacyIds.Contains(e.LegacyId!))
+                    .Select(e => new { e.LegacyId, IsSoftDeleted = e.DeletedAt != null })
+                    .ToListAsync(ct);
 
-        // Cross-connector deduplication: link saved records to canonical groups
-        try
-        {
-            var dedupInputs = entities.Select(e => new DeduplicationInput(
-                RecordId: e.Id,
-                Mills: new DateTimeOffset(e.StartTimestamp, TimeSpan.Zero).ToUnixTimeMilliseconds(),
-                DataSource: e.DataSource ?? "unknown",
-                Criteria: new MatchCriteria { Rate = e.Rate, RateTolerance = 0.05 }
-            )).ToList();
+                var existingSet = existingRecords.Select(r => r.LegacyId).ToHashSet();
+                var softDeletedCount = existingRecords.Count(r => r.IsSoftDeleted);
 
-            await _deduplicationService.DeduplicateBatchAsync(RecordType.TempBasal, dedupInputs, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to deduplicate {Type} batch of {Count}", "TempBasal", entities.Count);
-        }
+                if (softDeletedCount > 0)
+                    _logger.LogInformation(
+                        "Skipped {Count} previously-deleted {Type} records during import",
+                        softDeletedCount, "TempBasal");
 
-        return entities.Select(TempBasalMapper.ToDomainModel);
+                entities = entities
+                    .Where(e => string.IsNullOrEmpty(e.LegacyId) || !existingSet.Contains(e.LegacyId))
+                    .ToList();
+            }
+
+            if (entities.Count == 0)
+            {
+                await tx.CommitAsync(ct);
+                return [];
+            }
+
+            const int batchSize = 500;
+            foreach (var batch in entities.Chunk(batchSize))
+            {
+                ctx.TempBasals.AddRange(batch);
+                await ctx.SaveChangesAsync(ct);
+                ctx.ChangeTracker.Clear();
+            }
+
+            await tx.CommitAsync(ct);
+
+            // Cross-connector deduplication: link saved records to canonical groups
+            try
+            {
+                var dedupInputs = entities.Select(e => new DeduplicationInput(
+                    RecordId: e.Id,
+                    Mills: new DateTimeOffset(e.StartTimestamp, TimeSpan.Zero).ToUnixTimeMilliseconds(),
+                    DataSource: e.DataSource ?? "unknown",
+                    Criteria: new MatchCriteria { Rate = e.Rate, RateTolerance = 0.05 }
+                )).ToList();
+
+                await _deduplicationService.DeduplicateBatchAsync(RecordType.TempBasal, dedupInputs, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to deduplicate {Type} batch of {Count}", "TempBasal", entities.Count);
+            }
+
+            return entities.Select(TempBasalMapper.ToDomainModel);
+        });
     }
 
     /// <summary>
@@ -270,18 +349,20 @@ public class TempBasalRepository : ITempBasalRepository
         CancellationToken ct = default
     )
     {
-        return await _context.AuditedExecuteDeleteAsync(
-            _context.TempBasals.Where(e => e.DataSource == source && e.StartTimestamp >= from && e.StartTimestamp <= to),
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.AuditedSoftDeleteAsync(
+            ctx.TempBasals.Where(e => e.DataSource == source && e.StartTimestamp >= from && e.StartTimestamp <= to),
             _auditContext, ct);
     }
 
     /// <inheritdoc />
     public async Task<TempBasal?> GetActiveAtAsync(DateTime at, CancellationToken ct = default)
     {
-        var entity = await _context.TempBasals
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.TempBasals
             .AsNoTracking()
             .Where(t => t.StartTimestamp <= at && (t.EndTimestamp == null || t.EndTimestamp > at))
-            .Where(t => !_context.LinkedRecords
+            .Where(t => !ctx.LinkedRecords
                 .Any(lr => lr.RecordType == "tempbasal" && !lr.IsPrimary && lr.RecordId == t.Id))
             .OrderByDescending(t => t.StartTimestamp)
             .FirstOrDefaultAsync(ct);

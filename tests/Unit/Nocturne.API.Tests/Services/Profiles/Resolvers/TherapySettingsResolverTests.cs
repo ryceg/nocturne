@@ -14,6 +14,7 @@ public class TherapySettingsResolverTests : IDisposable
 {
     private readonly Mock<ITherapySettingsRepository> _repo = new();
     private readonly Mock<IPatientInsulinRepository> _insulinRepo = new();
+    private readonly Mock<IPatientRecordRepository> _patientRecordRepo = new();
     private readonly Mock<IActiveProfileResolver> _activeProfileResolver = new();
     private readonly Mock<ITenantAccessor> _tenantAccessor = new();
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
@@ -29,6 +30,7 @@ public class TherapySettingsResolverTests : IDisposable
         _sut = new TherapySettingsResolver(
             _repo.Object,
             _insulinRepo.Object,
+            _patientRecordRepo.Object,
             _activeProfileResolver.Object,
             _tenantAccessor.Object,
             _cache,
@@ -129,15 +131,71 @@ public class TherapySettingsResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task GetTimezone_ReturnsTimezone()
+    public async Task GetTimezone_PrefersPatientRecord_OverTherapySettings()
     {
-        var settings = MakeSettings(timezone: "Europe/London");
-        _repo.Setup(r => r.GetActiveAtAsync("Default", It.IsAny<DateTime>(), default))
-            .ReturnsAsync(settings);
+        // PatientRecord is the canonical source. When set, the resolver must use it
+        // regardless of any legacy value living on the active TherapySettings record.
+        _patientRecordRepo.Setup(r => r.GetAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PatientRecord { Timezone = "Australia/Sydney" });
+        _repo.Setup(r => r.GetActiveAtAsync(It.IsAny<string>(), It.IsAny<DateTime>(), default))
+            .ReturnsAsync(MakeSettings(timezone: "Europe/London"));
+
+        var result = await _sut.GetTimezoneAsync();
+
+        result.Should().Be("Australia/Sydney");
+    }
+
+    [Fact]
+    public async Task GetTimezone_FallsBackToTherapySettings_WhenPatientRecordHasNoTimezone()
+    {
+        // Legacy / connector-imported tenants may still have therapy_settings.timezone set
+        // but no patient_records.timezone backfilled. Treat the per-profile value as a
+        // fallback so existing data keeps working until backfill / next save.
+        _patientRecordRepo.Setup(r => r.GetAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PatientRecord { Timezone = null });
+        _activeProfileResolver.Setup(r => r.GetActiveProfileNameAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("A");
+        _repo.Setup(r => r.GetActiveAtAsync("A", It.IsAny<DateTime>(), default))
+            .ReturnsAsync(MakeSettings(timezone: "Europe/London"));
 
         var result = await _sut.GetTimezoneAsync();
 
         result.Should().Be("Europe/London");
+    }
+
+    [Fact]
+    public async Task GetTimezone_UsesActiveProfileForLegacyFallback_NotHardcodedDefault()
+    {
+        // Bug regression: previous implementation hardcoded the profile lookup to "Default",
+        // so a tenant whose only profiles are e.g. "A" and "B" got null even when "A" had a
+        // timezone. The fallback path must consult the active profile.
+        _patientRecordRepo.Setup(r => r.GetAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PatientRecord { Timezone = null });
+        _activeProfileResolver.Setup(r => r.GetActiveProfileNameAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("A");
+        _repo.Setup(r => r.GetActiveAtAsync("Default", It.IsAny<DateTime>(), default))
+            .ReturnsAsync((TherapySettings?)null);
+        _repo.Setup(r => r.GetActiveAtAsync("A", It.IsAny<DateTime>(), default))
+            .ReturnsAsync(MakeSettings(timezone: "Pacific/Auckland"));
+
+        var result = await _sut.GetTimezoneAsync();
+
+        result.Should().Be("Pacific/Auckland");
+    }
+
+    [Fact]
+    public async Task GetTimezone_ReturnsNull_WhenNeitherSourceHasTimezone()
+    {
+        _patientRecordRepo.Setup(r => r.GetAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((PatientRecord?)null);
+        _activeProfileResolver.Setup(r => r.GetActiveProfileNameAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+        _repo.Setup(r => r.GetActiveAtAsync(It.IsAny<string>(), It.IsAny<DateTime>(), default))
+            .ReturnsAsync((TherapySettings?)null);
+
+        var result = await _sut.GetTimezoneAsync();
+
+        result.Should().BeNull();
     }
 
     [Fact]

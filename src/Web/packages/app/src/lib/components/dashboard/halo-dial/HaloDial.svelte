@@ -105,14 +105,18 @@
       return;
     }
     let active = true;
-    getPredictions({})
-      .run()
-      .then((data) => {
-        if (active) predictions = data;
-      })
-      .catch(() => {
-        if (active) predictions = null;
-      });
+    // Defer out of render context — `.run()` rejects when called during render.
+    queueMicrotask(() => {
+      if (!active) return;
+      getPredictions({})
+        .run()
+        .then((data) => {
+          if (active) predictions = data;
+        })
+        .catch(() => {
+          if (active) predictions = null;
+        });
+    });
     return () => {
       active = false;
     };
@@ -169,7 +173,7 @@
     const sign = d > 0 ? "+" : "";
     return `${sign}${d.toFixed(0)}`;
   }
-  function fmtMinutes(ms: number): string {
+  function fmtMinutes(_ms: number): string {
     if (lastUpdated === 0) return "—";
     const mins = Math.floor((now - lastUpdated) / 60000);
     if (mins < 1) return "now";

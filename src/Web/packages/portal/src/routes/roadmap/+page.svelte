@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getRoadmapData, type RoadmapMilestone } from "$lib/data/portal.remote";
+    import { getRoadmapData, type RoadmapMilestone } from "$lib/data/portal";
     import { Button } from "@nocturne/ui/ui/button";
     import MilestoneCard from "$lib/components/MilestoneCard.svelte";
     import {
@@ -19,7 +19,7 @@
         loading = true;
         error = null;
         try {
-            roadmapData = await getRoadmapData({});
+            roadmapData = await getRoadmapData();
         } catch (e) {
             error = e instanceof Error ? e.message : "Failed to load roadmap";
         } finally {

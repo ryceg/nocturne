@@ -57,8 +57,8 @@
   }
 </script>
 
-{#await retrospectiveQuery}
-  <Card.Root class="border-2 border-primary/20 bg-primary/5">
+{#if !retrospectiveQuery.current && !retrospectiveQuery.error}
+  <Card.Root class="@container border-2 border-primary/20 bg-primary/5">
     <Card.Header class="pb-2">
       <Card.Title class="flex items-center gap-2 text-base">
         <Activity class="h-4 w-4" />
@@ -67,7 +67,7 @@
     </Card.Header>
     <Card.Content>
       <!-- Skeleton loading state - matches the layout below -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 @lg:grid-cols-4 gap-4">
         {#each [1, 2, 3, 4] as _}
           <div
             class="flex flex-col items-center gap-1 p-3 rounded-lg bg-background/50"
@@ -91,8 +91,36 @@
       </div>
     </Card.Content>
   </Card.Root>
-{:then data}
-  <Card.Root class="border-2 border-primary/20 bg-primary/5">
+{:else if retrospectiveQuery.error}
+  {@const error = retrospectiveQuery.error}
+  <Card.Root class="border-2 border-destructive/20 bg-destructive/5">
+    <Card.Header class="pb-2">
+      <Card.Title class="flex items-center gap-2 text-base text-destructive">
+        <AlertTriangle class="h-4 w-4" />
+        Error Loading Status
+      </Card.Title>
+    </Card.Header>
+    <Card.Content>
+      <div class="text-center space-y-3">
+        <p class="text-sm text-muted-foreground">
+          {error instanceof Error
+            ? error.message
+            : "Failed to load retrospective data"}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onclick={() => retrospectiveQuery.refresh()}
+        >
+          <RefreshCw class="h-4 w-4 mr-2" />
+          Try Again
+        </Button>
+      </div>
+    </Card.Content>
+  </Card.Root>
+{:else}
+  {@const data = retrospectiveQuery.current}
+  <Card.Root class="@container border-2 border-primary/20 bg-primary/5">
     <Card.Header class="pb-2">
       <Card.Title class="flex items-center gap-2 text-base">
         <Activity class="h-4 w-4" />
@@ -100,7 +128,7 @@
       </Card.Title>
     </Card.Header>
     <Card.Content>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 @lg:grid-cols-4 gap-4">
         <!-- Glucose -->
         <div
           class="flex flex-col items-center gap-1 p-3 rounded-lg bg-background/50"
@@ -221,30 +249,4 @@
       </div>
     </Card.Content>
   </Card.Root>
-{:catch error}
-  <Card.Root class="border-2 border-destructive/20 bg-destructive/5">
-    <Card.Header class="pb-2">
-      <Card.Title class="flex items-center gap-2 text-base text-destructive">
-        <AlertTriangle class="h-4 w-4" />
-        Error Loading Status
-      </Card.Title>
-    </Card.Header>
-    <Card.Content>
-      <div class="text-center space-y-3">
-        <p class="text-sm text-muted-foreground">
-          {error instanceof Error
-            ? error.message
-            : "Failed to load retrospective data"}
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={() => getRetrospectiveData({ time }).refresh()}
-        >
-          <RefreshCw class="h-4 w-4 mr-2" />
-          Try Again
-        </Button>
-      </div>
-    </Card.Content>
-  </Card.Root>
-{/await}
+{/if}

@@ -1,4 +1,4 @@
-export { createBot, type BotOptions } from "./bot.js";
+export { createBot, type BotOptions, type PlatformCredentials } from "./bot.js";
 export { AlertDeliveryHandler } from "./alerts/deliver.js";
 export { AlertCard, AcknowledgedCard, ResolvedCard } from "./cards/alert.js";
 export { GlucoseCard } from "./cards/glucose.js";

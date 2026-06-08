@@ -9,12 +9,17 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./ticket": {
+      "types": "./dist/lib/handshake-ticket.d.ts",
+      "default": "./dist/lib/handshake-ticket.js"
     }
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rimraf dist",
+    "test": "vitest run",
     "prepublishOnly": "pnpm run build"
   },
   "keywords": [
@@ -29,12 +34,15 @@
   "dependencies": {
     "@microsoft/signalr": "^8.0.0",
     "socket.io": "^4.7.5",
+    "tough-cookie": "^6.0.1",
     "winston": "^3.11.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
+    "@types/tough-cookie": "^4.0.5",
+    "rimraf": "^5.0.5",
     "typescript": "^5.3.3",
-    "rimraf": "^5.0.5"
+    "vitest": "^4.1.6"
   },
   "engines": {
     "node": ">=24"

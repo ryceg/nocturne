@@ -13,9 +13,12 @@ namespace Nocturne.API.Services.Alerts.Evaluators;
 /// <remarks>
 /// When <see cref="TimeOfDayCondition.From"/> &gt; <see cref="TimeOfDayCondition.To"/> the
 /// window is treated as wrapping past midnight (e.g. 22:00–06:00). A null
-/// <see cref="TimeOfDayCondition.Timezone"/> is treated as UTC. An unknown or unparseable
-/// timezone id, or unparseable time strings, yields <see langword="false"/> — alert
-/// evaluation is best-effort and a malformed rule must not crash the orchestrator.
+/// <see cref="TimeOfDayCondition.Timezone"/> falls back to
+/// <see cref="SensorContext.TenantTimeZoneId"/> so rules saved without an explicit per-rule
+/// timezone still evaluate in the diabetic's local time; only when both are missing does the
+/// evaluator fall back to UTC. An unknown or unparseable per-rule timezone id, or unparseable
+/// time strings, yields <see langword="false"/> — alert evaluation is best-effort and a
+/// malformed rule must not crash the orchestrator.
 /// </remarks>
 /// <seealso cref="IConditionEvaluator"/>
 public class TimeOfDayEvaluator : IConditionEvaluator
@@ -52,12 +55,10 @@ public class TimeOfDayEvaluator : IConditionEvaluator
         }
 
         TimeZoneInfo tz;
-        if (string.IsNullOrEmpty(condition.Timezone))
+        if (!string.IsNullOrEmpty(condition.Timezone))
         {
-            tz = TimeZoneInfo.Utc;
-        }
-        else
-        {
+            // Explicit per-rule timezone wins; an unparseable id is treated as a malformed
+            // rule (false) rather than silently falling back, to match the existing contract.
             try
             {
                 tz = TimeZoneInfo.FindSystemTimeZoneById(condition.Timezone);
@@ -66,6 +67,24 @@ public class TimeOfDayEvaluator : IConditionEvaluator
             {
                 return Task.FromResult(false);
             }
+        }
+        else if (!string.IsNullOrEmpty(context.TenantTimeZoneId))
+        {
+            // Tenant fallback: an unparseable tenant id swallows to UTC (matches
+            // DayOfWeekEvaluator) — the tenant tz arrives from configuration the rule author
+            // didn't choose, so we shouldn't refuse to evaluate over it.
+            try
+            {
+                tz = TimeZoneInfo.FindSystemTimeZoneById(context.TenantTimeZoneId);
+            }
+            catch
+            {
+                tz = TimeZoneInfo.Utc;
+            }
+        }
+        else
+        {
+            tz = TimeZoneInfo.Utc;
         }
 
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;

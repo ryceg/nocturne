@@ -1,5 +1,9 @@
 export type MarkStatus = "unseen" | "seen" | "dismissed" | "completed";
 
+export interface DismissOptions {
+  quiet?: boolean;
+}
+
 export interface MarkState {
   id: string;
   markKey: string;

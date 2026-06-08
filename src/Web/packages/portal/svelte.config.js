@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-node';
+import adapter from '@sveltejs/adapter-static';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { mdsvex } from 'mdsvex';
 import { remarkVars } from '@nocturne/cms/remark/vars';
@@ -9,18 +9,18 @@ const config = {
   extensions: ['.svelte', '.svx'],
   kit: {
     adapter: adapter({
-      out: 'build',
-      precompress: true,
+      pages: 'build',
+      assets: 'build',
+      fallback: '404.html',
     }),
+    paths: {
+      base: process.env.BASE_PATH ?? '',
+    },
     prerender: {
       handleHttpError: ({ path, message }) => {
-        // /setup lives in the main app, not the portal — ignore during prerendering
         if (path === '/setup') return;
         throw new Error(message);
       },
-    },
-    experimental: {
-      remoteFunctions: true,
     },
   },
   compilerOptions: {

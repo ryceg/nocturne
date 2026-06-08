@@ -25,6 +25,7 @@ public static class PatientRecordMapper
             PreferredName = model.PreferredName,
             Pronouns = model.Pronouns,
             AvatarUrl = model.AvatarUrl,
+            Timezone = model.Timezone,
             SysCreatedAt = DateTime.UtcNow,
             SysUpdatedAt = DateTime.UtcNow,
         };
@@ -50,6 +51,7 @@ public static class PatientRecordMapper
             PreferredName = entity.PreferredName,
             Pronouns = entity.Pronouns,
             AvatarUrl = entity.AvatarUrl,
+            Timezone = entity.Timezone,
             CreatedAt = entity.SysCreatedAt,
             ModifiedAt = entity.SysUpdatedAt,
         };
@@ -69,6 +71,7 @@ public static class PatientRecordMapper
         entity.PreferredName = model.PreferredName;
         entity.Pronouns = model.Pronouns;
         entity.AvatarUrl = model.AvatarUrl;
+        entity.Timezone = model.Timezone;
         entity.SysUpdatedAt = DateTime.UtcNow;
     }
 }

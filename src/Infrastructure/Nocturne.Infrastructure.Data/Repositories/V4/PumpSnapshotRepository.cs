@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Mappers.V4;
+using Nocturne.Infrastructure.Data.Services;
 
 namespace Nocturne.Infrastructure.Data.Repositories.V4;
 
@@ -11,17 +12,17 @@ namespace Nocturne.Infrastructure.Data.Repositories.V4;
 /// </summary>
 public class PumpSnapshotRepository : IPumpSnapshotRepository
 {
-    private readonly NocturneDbContext _context;
+    private readonly ITenantDbContextFactory _contextFactory;
     private readonly ILogger<PumpSnapshotRepository> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PumpSnapshotRepository"/> class.
     /// </summary>
-    /// <param name="context">The database context.</param>
+    /// <param name="contextFactory">The tenant database context factory.</param>
     /// <param name="logger">The logger instance.</param>
-    public PumpSnapshotRepository(NocturneDbContext context, ILogger<PumpSnapshotRepository> logger)
+    public PumpSnapshotRepository(ITenantDbContextFactory contextFactory, ILogger<PumpSnapshotRepository> logger)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _logger = logger;
     }
 
@@ -42,7 +43,8 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
         int limit = 100, int offset = 0, bool descending = true,
         CancellationToken ct = default)
     {
-        var query = _context.PumpSnapshots.AsNoTracking().AsQueryable();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.PumpSnapshots.AsNoTracking().AsQueryable();
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
         if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
         if (device != null) query = query.Where(e => e.Device == device);
@@ -59,7 +61,8 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
     /// <returns>The pump snapshot, or null if not found.</returns>
     public async Task<PumpSnapshot?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var entity = await _context.PumpSnapshots.FindAsync([id], ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PumpSnapshots.FindAsync([id], ct);
         return entity is null ? null : PumpSnapshotMapper.ToDomainModel(entity);
     }
 
@@ -71,14 +74,16 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
     /// <returns>The pump snapshot, or null if not found.</returns>
     public async Task<PumpSnapshot?> GetByLegacyIdAsync(string legacyId, CancellationToken ct = default)
     {
-        var entity = await _context.PumpSnapshots.FirstOrDefaultAsync(e => e.LegacyId == legacyId, ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PumpSnapshots.FirstOrDefaultAsync(e => e.LegacyId == legacyId, ct);
         return entity is null ? null : PumpSnapshotMapper.ToDomainModel(entity);
     }
 
     /// <inheritdoc />
     public async Task<PumpSnapshot?> GetLatestBeforeAsync(DateTime timestamp, CancellationToken ct = default)
     {
-        var entity = await _context.PumpSnapshots
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PumpSnapshots
             .AsNoTracking()
             .Where(e => e.Timestamp < timestamp)
             .OrderByDescending(e => e.Timestamp)
@@ -89,7 +94,8 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
     /// <inheritdoc />
     public async Task<PumpSnapshot?> GetLatestAsync(DateTime? asOf, CancellationToken ct = default)
     {
-        var query = _context.PumpSnapshots.AsNoTracking();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.PumpSnapshots.AsNoTracking();
         if (asOf.HasValue) query = query.Where(e => e.Timestamp <= asOf.Value);
         var entity = await query
             .OrderByDescending(e => e.Timestamp)
@@ -105,9 +111,10 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
     /// <returns>The created pump snapshot.</returns>
     public async Task<PumpSnapshot> CreateAsync(PumpSnapshot model, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity = PumpSnapshotMapper.ToEntity(model);
-        _context.PumpSnapshots.Add(entity);
-        await _context.SaveChangesAsync(ct);
+        ctx.PumpSnapshots.Add(entity);
+        await ctx.SaveChangesAsync(ct);
         return PumpSnapshotMapper.ToDomainModel(entity);
     }
 
@@ -120,10 +127,11 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
     /// <returns>The updated pump snapshot.</returns>
     public async Task<PumpSnapshot> UpdateAsync(Guid id, PumpSnapshot model, CancellationToken ct = default)
     {
-        var entity = await _context.PumpSnapshots.FindAsync([id], ct)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PumpSnapshots.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"PumpSnapshot {id} not found");
         PumpSnapshotMapper.UpdateEntity(entity, model);
-        await _context.SaveChangesAsync(ct);
+        await ctx.SaveChangesAsync(ct);
         return PumpSnapshotMapper.ToDomainModel(entity);
     }
 
@@ -134,10 +142,60 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
     /// <param name="ct">The cancellation token.</param>
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var entity = await _context.PumpSnapshots.FindAsync([id], ct)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PumpSnapshots.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"PumpSnapshot {id} not found");
-        _context.PumpSnapshots.Remove(entity);
-        await _context.SaveChangesAsync(ct);
+        entity.DeletedAt = DateTime.UtcNow;
+        await ctx.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<PumpSnapshot> RestoreAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PumpSnapshots.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.Id == id && e.DeletedAt != null)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException($"Soft-deleted PumpSnapshot {id} not found");
+        entity.DeletedAt = null;
+        await ctx.SaveChangesAsync(ct);
+        return PumpSnapshotMapper.ToDomainModel(entity);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<PumpSnapshot>> BulkRestoreAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var idSet = ids.ToHashSet();
+        var entities = await ctx.PumpSnapshots.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && idSet.Contains(e.Id) && e.DeletedAt != null)
+            .ToListAsync(ct);
+        foreach (var entity in entities)
+            entity.DeletedAt = null;
+        await ctx.SaveChangesAsync(ct);
+        return entities.Select(PumpSnapshotMapper.ToDomainModel);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<PumpSnapshot>> GetDeletedAsync(int limit, int offset, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entities = await ctx.PumpSnapshots.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.DeletedAt != null)
+            .OrderByDescending(e => e.DeletedAt)
+            .Skip(offset).Take(limit)
+            .AsNoTracking()
+            .ToListAsync(ct);
+        return entities.Select(PumpSnapshotMapper.ToDomainModel);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountDeletedAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.PumpSnapshots.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.DeletedAt != null)
+            .CountAsync(ct);
     }
 
     /// <summary>
@@ -152,7 +210,8 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
         var ids = correlationIds.ToList();
         if (ids.Count == 0) return [];
 
-        var entities = await _context.PumpSnapshots
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entities = await ctx.PumpSnapshots
             .AsNoTracking()
             .Where(e => e.CorrelationId != null && ids.Contains(e.CorrelationId.Value))
             .ToListAsync(ct);
@@ -169,7 +228,8 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
     /// <returns>The count of matching records.</returns>
     public async Task<int> CountAsync(DateTime? from, DateTime? to, CancellationToken ct = default)
     {
-        var query = _context.PumpSnapshots.AsNoTracking().AsQueryable();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.PumpSnapshots.AsNoTracking().AsQueryable();
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
         if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
         return await query.CountAsync(ct);
@@ -183,9 +243,10 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
     /// <returns>The number of deleted records.</returns>
     public async Task<int> DeleteByLegacyIdAsync(string legacyId, CancellationToken ct = default)
     {
-        return await _context.PumpSnapshots
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.PumpSnapshots
             .Where(e => e.LegacyId == legacyId)
-            .ExecuteDeleteAsync(ct);
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.DeletedAt, DateTime.UtcNow), ct);
     }
 
     /// <inheritdoc />
@@ -209,31 +270,49 @@ public class PumpSnapshotRepository : IPumpSnapshotRepository
             .Select(e => e.LegacyId!)
             .ToHashSet();
 
-        if (legacyIds.Count > 0)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var strategy = ctx.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var existingIds = await _context
-                .PumpSnapshots.AsNoTracking()
-                .Where(e => legacyIds.Contains(e.LegacyId!))
-                .Select(e => e.LegacyId)
-                .ToListAsync(ct);
+            await using var tx = await ctx.Database.BeginTransactionAsync(ct);
 
-            var existingSet = existingIds.ToHashSet();
-            entities = entities
-                .Where(e => string.IsNullOrEmpty(e.LegacyId) || !existingSet.Contains(e.LegacyId))
-                .ToList();
-        }
+            if (legacyIds.Count > 0)
+            {
+                var existingRecords = await ctx.PumpSnapshots.IgnoreQueryFilters().AsNoTracking()
+                    .Where(e => e.TenantId == ctx.TenantId)
+                    .Where(e => legacyIds.Contains(e.LegacyId!))
+                    .Select(e => new { e.LegacyId, IsSoftDeleted = e.DeletedAt != null })
+                    .ToListAsync(ct);
 
-        if (entities.Count == 0)
-            return [];
+                var existingSet = existingRecords.Select(r => r.LegacyId).ToHashSet();
+                var softDeletedCount = existingRecords.Count(r => r.IsSoftDeleted);
 
-        const int batchSize = 500;
-        foreach (var batch in entities.Chunk(batchSize))
-        {
-            _context.PumpSnapshots.AddRange(batch);
-            await _context.SaveChangesAsync(ct);
-            _context.ChangeTracker.Clear();
-        }
+                if (softDeletedCount > 0)
+                    _logger.LogInformation(
+                        "Skipped {Count} previously-deleted {Type} records during import",
+                        softDeletedCount, "PumpSnapshot");
 
-        return entities.Select(PumpSnapshotMapper.ToDomainModel);
+                entities = entities
+                    .Where(e => string.IsNullOrEmpty(e.LegacyId) || !existingSet.Contains(e.LegacyId))
+                    .ToList();
+            }
+
+            if (entities.Count == 0)
+            {
+                await tx.CommitAsync(ct);
+                return [];
+            }
+
+            const int batchSize = 500;
+            foreach (var batch in entities.Chunk(batchSize))
+            {
+                ctx.PumpSnapshots.AddRange(batch);
+                await ctx.SaveChangesAsync(ct);
+                ctx.ChangeTracker.Clear();
+            }
+
+            await tx.CommitAsync(ct);
+            return entities.Select(PumpSnapshotMapper.ToDomainModel);
+        });
     }
 }

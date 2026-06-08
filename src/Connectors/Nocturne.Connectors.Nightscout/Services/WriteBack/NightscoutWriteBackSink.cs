@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
+using Nocturne.Connectors.Core.Interfaces;
 using Nocturne.Connectors.Nightscout.Configurations;
 using Nocturne.Core.Contracts.Events;
 
@@ -13,18 +14,22 @@ namespace Nocturne.Connectors.Nightscout.Services.WriteBack;
 public abstract class NightscoutWriteBackSink<T> : IDataEventSink<T>
 {
     private readonly HttpClient _httpClient;
-    private readonly NightscoutConnectorConfiguration _config;
+    private readonly IConnectorConfigurationLoader<NightscoutConnectorConfiguration> _configLoader;
     private readonly NightscoutCircuitBreaker _circuitBreaker;
     private readonly ILogger _logger;
 
+    // Cached per sink instance. Sinks are transient (resolved from a scope per request),
+    // so this avoids repeated DB reads within a single request that writes multiple entities.
+    private NightscoutConnectorConfiguration? _cachedConfig;
+
     protected NightscoutWriteBackSink(
         HttpClient httpClient,
-        NightscoutConnectorConfiguration config,
+        IConnectorConfigurationLoader<NightscoutConnectorConfiguration> configLoader,
         NightscoutCircuitBreaker circuitBreaker,
         ILogger logger)
     {
         _httpClient = httpClient;
-        _config = config;
+        _configLoader = configLoader;
         _circuitBreaker = circuitBreaker;
         _logger = logger;
     }
@@ -41,35 +46,37 @@ public abstract class NightscoutWriteBackSink<T> : IDataEventSink<T>
 
     public async Task OnCreatedAsync(IReadOnlyList<T> items, CancellationToken ct = default)
     {
-        if (!ShouldProceed())
+        var config = await ResolveIfReadyAsync(ct);
+        if (config is null)
             return;
 
         var filtered = FilterItems(items);
         if (filtered.Count == 0)
             return;
 
-        // Batch into configured batch size
-        for (var i = 0; i < filtered.Count; i += _config.WriteBackBatchSize)
+        for (var i = 0; i < filtered.Count; i += config.WriteBackBatchSize)
         {
-            var batch = filtered.Skip(i).Take(_config.WriteBackBatchSize).ToList();
-            await SendAsync(HttpMethod.Post, Endpoint, batch, ct);
+            var batch = filtered.Skip(i).Take(config.WriteBackBatchSize).ToList();
+            await SendAsync(config, HttpMethod.Post, Endpoint, batch, ct);
         }
     }
 
     public async Task OnCreatedAsync(T item, CancellationToken ct = default)
     {
-        if (!ShouldProceed() || ShouldSkip(item))
+        var config = await ResolveIfReadyAsync(ct);
+        if (config is null || ShouldSkip(item))
             return;
 
-        await SendAsync(HttpMethod.Post, Endpoint, new[] { item }, ct);
+        await SendAsync(config, HttpMethod.Post, Endpoint, new[] { item }, ct);
     }
 
     public async Task OnUpdatedAsync(T item, CancellationToken ct = default)
     {
-        if (!ShouldProceed() || ShouldSkip(item))
+        var config = await ResolveIfReadyAsync(ct);
+        if (config is null || ShouldSkip(item))
             return;
 
-        await SendAsync(HttpMethod.Put, Endpoint, item, ct);
+        await SendAsync(config, HttpMethod.Put, Endpoint, item, ct);
     }
 
     public Task OnDeletedAsync(T? item, CancellationToken ct = default)
@@ -81,20 +88,30 @@ public abstract class NightscoutWriteBackSink<T> : IDataEventSink<T>
         return Task.CompletedTask;
     }
 
-    private bool ShouldProceed()
+    private async Task<NightscoutConnectorConfiguration?> ResolveIfReadyAsync(CancellationToken ct)
     {
-        if (!_config.WriteBackEnabled)
-            return false;
+        var config = _cachedConfig ??= await _configLoader.LoadForTenantAsync(ct);
+
+        if (!config.WriteBackEnabled)
+            return null;
 
         if (_circuitBreaker.IsOpen)
         {
             _logger.LogDebug(
                 "Nightscout write-back circuit breaker is open, skipping {Endpoint}",
                 Endpoint);
-            return false;
+            return null;
         }
 
-        return true;
+        return config;
+    }
+
+    private static string ResolveAbsoluteUrl(string configUrl, string endpoint)
+    {
+        var baseUrl = configUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? configUrl
+            : $"https://{configUrl}";
+        return $"{baseUrl.TrimEnd('/')}{endpoint}";
     }
 
     private List<T> FilterItems(IReadOnlyList<T> items)
@@ -110,6 +127,7 @@ public abstract class NightscoutWriteBackSink<T> : IDataEventSink<T>
     }
 
     private async Task SendAsync<TPayload>(
+        NightscoutConnectorConfiguration config,
         HttpMethod method,
         string endpoint,
         TPayload payload,
@@ -117,10 +135,11 @@ public abstract class NightscoutWriteBackSink<T> : IDataEventSink<T>
     {
         try
         {
-            using var request = new HttpRequestMessage(method, endpoint);
+            var absoluteUrl = ResolveAbsoluteUrl(config.Url, endpoint);
+            using var request = new HttpRequestMessage(method, absoluteUrl);
             request.Headers.Add(
                 "api-secret",
-                NightscoutConnectorService.ComputeApiSecretHash(_config.ApiSecret));
+                NightscoutConnectorService.ComputeApiSecretHash(config.ApiSecret));
             request.Content = JsonContent.Create(payload);
 
             using var response = await _httpClient.SendAsync(request, ct);

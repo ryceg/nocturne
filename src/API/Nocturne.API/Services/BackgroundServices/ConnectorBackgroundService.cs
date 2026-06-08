@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using System.Reflection;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,19 +16,18 @@ namespace Nocturne.API.Services.BackgroundServices;
 /// on a per-tenant basis within the API process.
 /// </summary>
 /// <typeparam name="TConfig">
-/// The connector configuration type, which must implement <see cref="IConnectorConfiguration"/>.
+/// The connector configuration type, which must extend <see cref="BaseConnectorConfiguration"/>.
 /// </typeparam>
 /// <remarks>
 /// The service polls every minute and only syncs a given tenant when its configured
-/// <c>SyncIntervalMinutes</c> has elapsed since the last sync. Database configuration
-/// and secrets are loaded fresh for each tenant sync cycle via <see cref="LoadDatabaseConfigurationAsync"/>.
+/// <c>SyncIntervalMinutes</c> has elapsed since the last sync. Per-tenant configuration
+/// is loaded fresh each cycle via <see cref="IConnectorConfigurationLoader{TConfig}"/>.
 /// </remarks>
 public abstract class ConnectorBackgroundService<TConfig> : BackgroundService
-    where TConfig : class, IConnectorConfiguration
+    where TConfig : BaseConnectorConfiguration
 {
     protected readonly IServiceProvider ServiceProvider;
     protected readonly ILogger Logger;
-    protected readonly TConfig Config;
 
     /// <summary>
     /// Tracks the last sync time per tenant so each tenant's configured
@@ -39,20 +36,61 @@ public abstract class ConnectorBackgroundService<TConfig> : BackgroundService
     private readonly ConcurrentDictionary<Guid, DateTime> _lastSyncByTenant = new();
 
     /// <summary>
+    /// Tracks the last time a nudge (immediate sync request) was accepted per tenant,
+    /// used to debounce rapid consecutive calls.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, DateTime> _lastNudgeByTenant = new();
+
+    private static readonly TimeSpan NudgeDebounceWindow = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Maximum number of tenants this connector syncs concurrently. Tenants sync in parallel so one
+    /// tenant's slow or failing sync never blocks another's; this only caps resource use (DB
+    /// connections, outbound requests). Overridable for tests.
+    /// </summary>
+    protected virtual int MaxConcurrentTenantSyncs => 8;
+
+    /// <summary>
+    /// Maximum wall-clock time a single tenant's sync may run before it is cancelled. Bounds how long
+    /// one stuck or failing tenant — e.g. a hung network call or an auth-retry storm against bad
+    /// credentials — can hold a concurrency slot. Overridable for tests.
+    /// </summary>
+    protected virtual TimeSpan PerTenantSyncTimeout => TimeSpan.FromMinutes(3);
+
+    /// <summary>
     /// Initialises a new <see cref="ConnectorBackgroundService{TConfig}"/>.
     /// </summary>
     /// <param name="serviceProvider">Root DI service provider; a new scope is created per tenant sync.</param>
-    /// <param name="config">Connector configuration singleton; updated at runtime from DB values.</param>
     /// <param name="logger">Logger instance.</param>
     protected ConnectorBackgroundService(
         IServiceProvider serviceProvider,
-        TConfig config,
         ILogger logger
     )
     {
         ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        Config = config ?? throw new ArgumentNullException(nameof(config));
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Requests an immediate sync for the specified tenant on the next poll cycle.
+    /// Removes the tenant's last-sync timestamp so the interval check passes immediately.
+    /// Calls within <see cref="NudgeDebounceWindow"/> of a previous nudge for the same
+    /// tenant are silently ignored to prevent event storms.
+    /// </summary>
+    /// <param name="tenantId">The tenant to sync immediately.</param>
+    protected void RequestImmediateSync(Guid tenantId)
+    {
+        var now = DateTime.UtcNow;
+
+        if (_lastNudgeByTenant.TryGetValue(tenantId, out var lastNudge) && now - lastNudge < NudgeDebounceWindow)
+            return;
+
+        _lastNudgeByTenant[tenantId] = now;
+        _lastSyncByTenant.TryRemove(tenantId, out _);
+
+        Logger.LogDebug(
+            "Immediate sync requested for {ConnectorName} tenant {TenantId}",
+            ConnectorName, tenantId);
     }
 
     /// <summary>
@@ -61,123 +99,34 @@ public abstract class ConnectorBackgroundService<TConfig> : BackgroundService
     protected abstract string ConnectorName { get; }
 
     /// <summary>
+    /// Called once after the initial startup delay, before the poll loop begins.
+    /// Override to start real-time listeners (e.g. webhooks, SSE, WebSocket connections).
+    /// The default implementation is a no-op.
+    /// </summary>
+    protected virtual Task StartRealtimeListenersAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// Called when the service is shutting down, after the poll loop exits.
+    /// Override to tear down any real-time listeners started in <see cref="StartRealtimeListenersAsync"/>.
+    /// The default implementation is a no-op.
+    /// </summary>
+    protected virtual Task StopRealtimeListenersAsync() => Task.CompletedTask;
+
+    /// <summary>
     /// Performs a single sync operation using the connector service.
     /// Services should be resolved from the provided <paramref name="scopeProvider"/>
     /// which has the tenant context already set.
     /// </summary>
     /// <param name="scopeProvider">Tenant-scoped service provider</param>
+    /// <param name="config">Per-tenant connector configuration loaded by the framework</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <param name="progressReporter">Optional progress reporter for sync status updates</param>
     /// <returns>A SyncResult indicating success/failure and any error details</returns>
-    protected abstract Task<SyncResult> PerformSyncAsync(IServiceProvider scopeProvider, CancellationToken cancellationToken, ISyncProgressReporter? progressReporter = null);
-
-    /// <summary>
-    /// Loads runtime configuration and secrets from the database and applies them
-    /// to the <see cref="Config"/> singleton. Ensures DB-stored values (including encrypted
-    /// passwords) are available to the connector at runtime.
-    /// </summary>
-    /// <param name="scopeProvider">Tenant-scoped service provider for resolving <see cref="IConnectorConfigurationService"/>.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>
-    /// <see langword="true"/> when a database configuration row exists for this connector;
-    /// <see langword="false"/> when no configuration is found and the sync should be skipped.
-    /// </returns>
-    protected async Task<bool> LoadDatabaseConfigurationAsync(IServiceProvider scopeProvider, CancellationToken ct)
-    {
-        try
-        {
-            var configService = scopeProvider.GetRequiredService<IConnectorConfigurationService>();
-
-            // Load runtime configuration from DB
-            var dbConfig = await configService.GetConfigurationAsync(ConnectorName, ct);
-            if (dbConfig == null)
-            {
-                Logger.LogDebug("No configuration found for {ConnectorName}, skipping sync", ConnectorName);
-                return false;
-            }
-
-            if (dbConfig.Configuration != null)
-            {
-                ApplyJsonToConfig(dbConfig.Configuration);
-                Logger.LogDebug("Applied database configuration for {ConnectorName}", ConnectorName);
-            }
-
-            // Load and decrypt secrets from DB
-            var secrets = await configService.GetSecretsAsync(ConnectorName, ct);
-            if (secrets.Count > 0)
-            {
-                ApplySecretsToConfig(secrets);
-                Logger.LogDebug("Applied {Count} secrets for {ConnectorName}", secrets.Count, ConnectorName);
-            }
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex,
-                "Failed to load database configuration for {ConnectorName}, using environment/startup values",
-                ConnectorName);
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Applies JSON configuration values to the <see cref="Config"/> object using reflection.
-    /// Matches camelCase JSON property names to PascalCase C# property names.
-    /// </summary>
-    /// <param name="configuration">The parsed JSON document containing connector configuration values.</param>
-    private void ApplyJsonToConfig(JsonDocument configuration)
-    {
-        var properties = Config.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-        var root = configuration.RootElement;
-
-        foreach (var property in properties)
-        {
-            if (!property.CanWrite) continue;
-
-            var camelName = char.ToLowerInvariant(property.Name[0]) + property.Name[1..];
-            if (!root.TryGetProperty(camelName, out var element)) continue;
-
-            try
-            {
-                if (property.PropertyType == typeof(string) && element.ValueKind == JsonValueKind.String)
-                    property.SetValue(Config, element.GetString());
-                else if (property.PropertyType == typeof(int) && element.ValueKind == JsonValueKind.Number)
-                    property.SetValue(Config, element.GetInt32());
-                else if (property.PropertyType == typeof(double) && element.ValueKind == JsonValueKind.Number)
-                    property.SetValue(Config, element.GetDouble());
-                else if (property.PropertyType == typeof(bool) &&
-                         (element.ValueKind == JsonValueKind.True || element.ValueKind == JsonValueKind.False))
-                    property.SetValue(Config, element.GetBoolean());
-            }
-            catch (Exception ex)
-            {
-                Logger.LogDebug(ex, "Could not apply config property {Property} for {ConnectorName}",
-                    property.Name, ConnectorName);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Applies decrypted secret values to the <see cref="Config"/> object using reflection.
-    /// Matches camelCase secret keys to PascalCase C# properties of type <see cref="string"/>.
-    /// </summary>
-    /// <param name="secrets">Dictionary of camelCase secret names to decrypted string values.</param>
-    private void ApplySecretsToConfig(Dictionary<string, string> secrets)
-    {
-        var properties = Config.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-
-        foreach (var property in properties)
-        {
-            if (!property.CanWrite || property.PropertyType != typeof(string)) continue;
-
-            var camelName = char.ToLowerInvariant(property.Name[0]) + property.Name[1..];
-            if (secrets.TryGetValue(camelName, out var value))
-            {
-                property.SetValue(Config, value);
-            }
-        }
-    }
+    protected abstract Task<SyncResult> PerformSyncAsync(
+        IServiceProvider scopeProvider,
+        TConfig config,
+        CancellationToken cancellationToken,
+        ISyncProgressReporter? progressReporter = null);
 
     /// <summary>
     /// Persists the health state for this connector to the database via <see cref="IConnectorConfigurationService"/>.
@@ -228,6 +177,18 @@ public abstract class ConnectorBackgroundService<TConfig> : BackgroundService
 
         try
         {
+            try
+            {
+                await StartRealtimeListenersAsync(stoppingToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Logger.LogWarning(
+                    ex,
+                    "Failed to start real-time listeners for {ConnectorName}, falling back to polling",
+                    ConnectorName);
+            }
+
             // Poll every minute; each tenant is only synced when its own
             // SyncIntervalMinutes has elapsed since its last sync.
             using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
@@ -250,6 +211,18 @@ public abstract class ConnectorBackgroundService<TConfig> : BackgroundService
         }
         finally
         {
+            try
+            {
+                await StopRealtimeListenersAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(
+                    ex,
+                    "Failed to stop real-time listeners for {ConnectorName}",
+                    ConnectorName);
+            }
+
             Logger.LogInformation(
                 "{ConnectorName} connector background service stopped",
                 ConnectorName);
@@ -266,19 +239,45 @@ public abstract class ConnectorBackgroundService<TConfig> : BackgroundService
             .Select(t => new { t.Id, t.Slug, t.DisplayName })
             .ToListAsync(stoppingToken);
 
-        foreach (var tenant in tenants)
-        {
-            try
+        // Sync tenants concurrently so each tenant is independent: one tenant's slow or failing sync
+        // must never delay or block another's. Each tenant already runs in its own DI scope (own
+        // DbContext, own tenant context), so concurrent execution is isolated. MaxConcurrentTenantSyncs
+        // only caps resource use (DB connections, outbound requests), and PerTenantSyncTimeout bounds
+        // how long any single tenant can hold a slot.
+        await Parallel.ForEachAsync(
+            tenants,
+            new ParallelOptions
             {
-                await SyncForTenantAsync(tenant.Id, tenant.Slug, tenant.DisplayName, stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+                MaxDegreeOfParallelism = MaxConcurrentTenantSyncs,
+                CancellationToken = stoppingToken
+            },
+            async (tenant, ct) =>
             {
-                Logger.LogError(ex,
-                    "Error syncing {ConnectorName} for tenant {TenantSlug}",
-                    ConnectorName, tenant.Slug);
-            }
-        }
+                using var tenantCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                tenantCts.CancelAfter(PerTenantSyncTimeout);
+
+                try
+                {
+                    await SyncForTenantAsync(tenant.Id, tenant.Slug, tenant.DisplayName, tenantCts.Token);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw; // The service itself is shutting down — propagate to stop the loop.
+                }
+                catch (OperationCanceledException)
+                {
+                    // Per-tenant timeout fired. Abandon this tenant so it frees its slot for others.
+                    Logger.LogWarning(
+                        "{ConnectorName} sync for tenant {TenantSlug} exceeded {Timeout} and was cancelled",
+                        ConnectorName, tenant.Slug, PerTenantSyncTimeout);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex,
+                        "Error syncing {ConnectorName} for tenant {TenantSlug}",
+                        ConnectorName, tenant.Slug);
+                }
+            });
     }
 
     private async Task SyncForTenantAsync(Guid tenantId, string tenantSlug, string displayName, CancellationToken stoppingToken)
@@ -293,17 +292,41 @@ public abstract class ConnectorBackgroundService<TConfig> : BackgroundService
         var dbContext = scope.ServiceProvider.GetRequiredService<NocturneDbContext>();
         dbContext.AuditContext = SystemAuditContext.ForService($"connector:{ConnectorName}");
 
-        // Load tenant-specific connector configuration; skip if no config exists in DB
-        var hasConfig = await LoadDatabaseConfigurationAsync(scope.ServiceProvider, stoppingToken);
-        if (!hasConfig)
-            return;
+        // Pin the RLS tenant on the scoped DbContext. NocturneDbContext is leased from a pool
+        // (AddPooledDbContextFactory) and its TenantId is NOT reset between leases, so a context
+        // can arrive carrying a previous lessee's tenant. On HTTP requests the auth handlers set
+        // dbContext.TenantId explicitly; background syncs have no such handler, so we must set it
+        // here. Setting ITenantAccessor alone does not retro-fit the already-leased context — the
+        // TenantConnectionInterceptor reads NocturneDbContext.TenantId to configure RLS on connection
+        // open. Without this, tenant-scoped reads (connector config + secrets) run under a stale or
+        // empty tenant and silently return nothing, so every connector authenticates with empty
+        // credentials and no data syncs.
+        dbContext.TenantId = tenantId;
 
-        if (!Config.Enabled || Config.SyncIntervalMinutes <= 0)
+        // Load per-tenant config via the loader
+        var loader = scope.ServiceProvider.GetRequiredService<IConnectorConfigurationLoader<TConfig>>();
+        TConfig config;
+        try
+        {
+            config = await loader.LoadForTenantAsync(stoppingToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogWarning(ex, "Failed to load config for {ConnectorName}/{TenantSlug}", ConnectorName, tenantSlug);
+            return;
+        }
+        catch (DbUpdateException ex)
+        {
+            Logger.LogWarning(ex, "Failed to load config for {ConnectorName}/{TenantSlug}", ConnectorName, tenantSlug);
+            return;
+        }
+
+        if (!config.Enabled || config.SyncIntervalMinutes <= 0)
             return;
 
         // Only sync when the tenant's configured interval has elapsed
         var now = DateTime.UtcNow;
-        var interval = TimeSpan.FromMinutes(Config.SyncIntervalMinutes);
+        var interval = TimeSpan.FromMinutes(config.SyncIntervalMinutes);
         if (_lastSyncByTenant.TryGetValue(tenantId, out var lastSync) && now - lastSync < interval)
             return;
 
@@ -317,7 +340,7 @@ public abstract class ConnectorBackgroundService<TConfig> : BackgroundService
             cancellationToken: stoppingToken);
 
         var progressReporter = scope.ServiceProvider.GetService<ISyncProgressReporter>();
-        var result = await PerformSyncAsync(scope.ServiceProvider, stoppingToken, progressReporter);
+        var result = await PerformSyncAsync(scope.ServiceProvider, config, stoppingToken, progressReporter);
 
         if (result.Success)
         {

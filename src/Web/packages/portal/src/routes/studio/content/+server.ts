@@ -5,6 +5,8 @@ import { resolve, basename } from 'node:path';
 import { parseFrontmatter } from '@nocturne/cms/blog/manifest';
 import type { RequestHandler } from './$types';
 
+export const prerender = false;
+
 const CONTENT_DIR = resolve('src/content/blog');
 
 export const GET: RequestHandler = async () => {

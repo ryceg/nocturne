@@ -15,6 +15,7 @@ import {
   ApsSnapshotClient,
   AuditClient,
   AvatarClient,
+  BasalInjectionClient,
   BatteryClient,
   BGCheckClient,
   BodyWeightClient,
@@ -30,6 +31,7 @@ import {
   CompressionLowClient,
   ConfigurationClient,
   ConnectedAppsClient,
+  ConnectorAdminClient,
   ConnectorFoodEntriesClient,
   ConnectorStatusClient,
   CorrelationClient,
@@ -51,6 +53,7 @@ import {
   LinkedPlatformsClient,
   MealMatchingClient,
   MemberInviteClient,
+  MembershipRequestClient,
   MetadataClient,
   MeterGlucoseClient,
   MigrationClient,
@@ -68,6 +71,8 @@ import {
   PasskeyClient,
   PatientRecordClient,
   PlatformClient,
+  PlatformAccessClient,
+  PlatformSettingsClient,
   PredictionClient,
   ProcessingClient,
   ProfileClient,
@@ -77,6 +82,7 @@ import {
   SensorGlucoseClient,
   ServicesClient,
   SetupClient,
+  ShareLinkClient,
   StateSpansClient,
   StatisticsClient,
   StatusClient,
@@ -115,6 +121,7 @@ export class ApiClient {
   public readonly apsSnapshot: ApsSnapshotClient;
   public readonly audit: AuditClient;
   public readonly avatar: AvatarClient;
+  public readonly basalInjection: BasalInjectionClient;
   public readonly battery: BatteryClient;
   public readonly bGCheck: BGCheckClient;
   public readonly bodyWeight: BodyWeightClient;
@@ -130,6 +137,7 @@ export class ApiClient {
   public readonly compressionLow: CompressionLowClient;
   public readonly configuration: ConfigurationClient;
   public readonly connectedApps: ConnectedAppsClient;
+  public readonly connectorAdmin: ConnectorAdminClient;
   public readonly connectorFoodEntries: ConnectorFoodEntriesClient;
   public readonly connectorStatus: ConnectorStatusClient;
   public readonly correlation: CorrelationClient;
@@ -151,6 +159,7 @@ export class ApiClient {
   public readonly linkedPlatforms: LinkedPlatformsClient;
   public readonly mealMatching: MealMatchingClient;
   public readonly memberInvite: MemberInviteClient;
+  public readonly membershipRequest: MembershipRequestClient;
   public readonly metadata: MetadataClient;
   public readonly meterGlucose: MeterGlucoseClient;
   public readonly migration: MigrationClient;
@@ -168,6 +177,8 @@ export class ApiClient {
   public readonly passkey: PasskeyClient;
   public readonly patientRecord: PatientRecordClient;
   public readonly platform: PlatformClient;
+  public readonly platformAccess: PlatformAccessClient;
+  public readonly platformSettings: PlatformSettingsClient;
   public readonly predictions: PredictionClient;
   public readonly processing: ProcessingClient;
   public readonly profile: ProfileClient;
@@ -177,6 +188,7 @@ export class ApiClient {
   public readonly sensorGlucose: SensorGlucoseClient;
   public readonly services: ServicesClient;
   public readonly setup: SetupClient;
+  public readonly shareLink: ShareLinkClient;
   public readonly stateSpans: StateSpansClient;
   public readonly statistics: StatisticsClient;
   public readonly status: StatusClient;
@@ -215,6 +227,7 @@ export class ApiClient {
     this.apsSnapshot = new ApsSnapshotClient(apiBaseUrl, http);
     this.audit = new AuditClient(apiBaseUrl, http);
     this.avatar = new AvatarClient(apiBaseUrl, http);
+    this.basalInjection = new BasalInjectionClient(apiBaseUrl, http);
     this.battery = new BatteryClient(apiBaseUrl, http);
     this.bGCheck = new BGCheckClient(apiBaseUrl, http);
     this.bodyWeight = new BodyWeightClient(apiBaseUrl, http);
@@ -230,6 +243,7 @@ export class ApiClient {
     this.compressionLow = new CompressionLowClient(apiBaseUrl, http);
     this.configuration = new ConfigurationClient(apiBaseUrl, http);
     this.connectedApps = new ConnectedAppsClient(apiBaseUrl, http);
+    this.connectorAdmin = new ConnectorAdminClient(apiBaseUrl, http);
     this.connectorFoodEntries = new ConnectorFoodEntriesClient(apiBaseUrl, http);
     this.connectorStatus = new ConnectorStatusClient(apiBaseUrl, http);
     this.correlation = new CorrelationClient(apiBaseUrl, http);
@@ -251,6 +265,7 @@ export class ApiClient {
     this.linkedPlatforms = new LinkedPlatformsClient(apiBaseUrl, http);
     this.mealMatching = new MealMatchingClient(apiBaseUrl, http);
     this.memberInvite = new MemberInviteClient(apiBaseUrl, http);
+    this.membershipRequest = new MembershipRequestClient(apiBaseUrl, http);
     this.metadata = new MetadataClient(apiBaseUrl, http);
     this.meterGlucose = new MeterGlucoseClient(apiBaseUrl, http);
     this.migration = new MigrationClient(apiBaseUrl, http);
@@ -268,6 +283,8 @@ export class ApiClient {
     this.passkey = new PasskeyClient(apiBaseUrl, http);
     this.patientRecord = new PatientRecordClient(apiBaseUrl, http);
     this.platform = new PlatformClient(apiBaseUrl, http);
+    this.platformAccess = new PlatformAccessClient(apiBaseUrl, http);
+    this.platformSettings = new PlatformSettingsClient(apiBaseUrl, http);
     this.predictions = new PredictionClient(apiBaseUrl, http);
     this.processing = new ProcessingClient(apiBaseUrl, http);
     this.profile = new ProfileClient(apiBaseUrl, http);
@@ -277,6 +294,7 @@ export class ApiClient {
     this.sensorGlucose = new SensorGlucoseClient(apiBaseUrl, http);
     this.services = new ServicesClient(apiBaseUrl, http);
     this.setup = new SetupClient(apiBaseUrl, http);
+    this.shareLink = new ShareLinkClient(apiBaseUrl, http);
     this.stateSpans = new StateSpansClient(apiBaseUrl, http);
     this.statistics = new StatisticsClient(apiBaseUrl, http);
     this.status = new StatusClient(apiBaseUrl, http);

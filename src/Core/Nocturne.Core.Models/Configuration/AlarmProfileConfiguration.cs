@@ -292,7 +292,7 @@ public class AlarmVisualSettings
     /// Flash frequency in milliseconds
     /// </summary>
     [JsonPropertyName("flashIntervalMs")]
-    public int FlashIntervalMs { get; set; } = 500;
+    public int FlashIntervalMs { get; set; } = 1000;
 
     /// <summary>
     /// Whether to show a persistent banner until acknowledged

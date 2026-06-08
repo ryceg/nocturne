@@ -21,7 +21,7 @@ public class MeterGlucoseRepositoryBulkCreateTests : IDisposable
         var dbName = $"meter_glucose_bulk_tests_{Guid.NewGuid()}";
         _context = TestDbContextFactory.CreateInMemoryContext(dbName);
         _context.TenantId = TenantA;
-        _repository = new MeterGlucoseRepository(_context, NullLogger<MeterGlucoseRepository>.Instance);
+        _repository = new MeterGlucoseRepository(new TestTenantDbContextFactory(_context), NullLogger<MeterGlucoseRepository>.Instance);
     }
 
     public void Dispose()

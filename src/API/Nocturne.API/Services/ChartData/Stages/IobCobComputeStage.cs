@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Nocturne.API.Helpers;
+using Nocturne.Core.Contracts.Analytics;
 using Nocturne.Core.Contracts.Profiles.Resolvers;
 using Nocturne.Core.Contracts.Treatments;
 using Nocturne.Core.Contracts.Multitenancy;
@@ -31,8 +31,8 @@ namespace Nocturne.API.Services.ChartData.Stages;
 /// and interval. The tenant ID component prevents cross-tenant cache leakage.
 /// </para>
 /// <para>
-/// Basal series construction (<see cref="BuildBasalSeriesFromTempBasalsAsync"/>) uses v4
-/// <see cref="TempBasal"/> records as the source of truth and fills any gaps with
+/// Basal series construction is delegated to <see cref="IBasalSeriesBuilder"/>, which uses
+/// v4 <see cref="TempBasal"/> records as the source of truth and fills any gaps with
 /// profile-inferred rates at 5-minute resolution. When no TempBasal records exist the
 /// entire series is inferred from the profile. The y-axis maximum is clamped to at least
 /// 2.5× the default basal rate so the chart always shows meaningful scale.
@@ -47,8 +47,7 @@ namespace Nocturne.API.Services.ChartData.Stages;
 internal sealed class IobCobComputeStage(
     IIobCalculator iobCalculator,
     ICobCalculator cobCalculator,
-    ITherapySettingsResolver therapySettingsResolver,
-    IBasalRateResolver basalRateResolver,
+    IBasalSeriesBuilder basalSeriesBuilder,
     ITherapyTimelineResolver therapyTimelineResolver,
     IMemoryCache cache,
     ITenantAccessor tenantAccessor,
@@ -70,17 +69,15 @@ internal sealed class IobCobComputeStage(
         var intervalMinutes = context.IntervalMinutes;
         var defaultBasalRate = context.DefaultBasalRate;
 
-        var (iobSeries, cobSeries, maxIob, maxCob) = await BuildIobCobSeriesAsync(
-            bolusList,
-            carbIntakeList,
-            startTime,
-            endTime,
-            intervalMinutes,
-            tempBasalList,
-            cancellationToken
+        // Build once, then thread through both IOB/COB and the basal series so the resolver
+        // is hit a single time per chart-data request.
+        var timeline = await therapyTimelineResolver.BuildAsync(startTime, endTime + 1, ct: cancellationToken);
+
+        var (iobSeries, cobSeries, maxIob, maxCob) = BuildIobCobSeries(
+            bolusList, carbIntakeList, startTime, endTime, intervalMinutes, tempBasalList, timeline, cancellationToken
         );
 
-        var basalSeries = await BuildBasalSeriesFromTempBasalsAsync(tempBasalList, startTime, endTime, defaultBasalRate, cancellationToken);
+        var basalSeries = await basalSeriesBuilder.BuildAsync(tempBasalList, startTime, endTime, defaultBasalRate, timeline, cancellationToken);
 
         var maxBasalRate = Math.Max(
             defaultBasalRate * 2.5,
@@ -98,21 +95,23 @@ internal sealed class IobCobComputeStage(
         };
     }
 
-    internal async Task<(
+    internal (
         List<TimeSeriesPoint> iobSeries,
         List<TimeSeriesPoint> cobSeries,
         double maxIob,
         double maxCob
-    )> BuildIobCobSeriesAsync(
+    ) BuildIobCobSeries(
         List<Bolus> boluses,
         List<CarbIntake> carbIntakes,
         long startTime,
         long endTime,
         int intervalMinutes,
-        List<TempBasal>? tempBasals = null,
+        List<TempBasal>? tempBasals,
+        TherapyTimeline timeline,
         CancellationToken ct = default
     )
     {
+
         // Generate cache key based on data hash and time range
         var cacheKey = GenerateIobCobCacheKey(boluses, carbIntakes, startTime, endTime, intervalMinutes, tempBasals);
 
@@ -145,12 +144,6 @@ internal sealed class IobCobComputeStage(
         double maxIob = 0,
             maxCob = 0;
 
-        // Build the request-scoped therapy timeline once. SnapshotAt(t) inside the loop
-        // resolves DIA / sensitivity / carb ratio / basal rate / carbsPerHour via in-memory
-        // schedule lookup with a sticky cursor — replacing nested async resolver awaits per tick.
-        // The window extends one millisecond past endTime so SnapshotAt(endTime) lands inside a segment.
-        var timeline = await therapyTimelineResolver.BuildAsync(startTime, endTime + 1, ct: ct);
-
         // DIA at endTime drives the IOB / temp-basal eviction window. Matches legacy behavior.
         var diaMs = (long)(timeline.SnapshotAt(endTime).Dia * 60 * 60 * 1000);
         var cobAbsorptionMs = 6L * 60 * 60 * 1000;
@@ -181,6 +174,10 @@ internal sealed class IobCobComputeStage(
         {
             ct.ThrowIfCancellationRequested();
 
+            // One in-memory therapy snapshot per tick drives every profile lookup below
+            // (DIA, sensitivity, scheduled basal rate, carb ratio) with zero DB round trips.
+            var snapshot = timeline.SnapshotAt(t);
+
             // Admit newly-elapsed entries (Mills/StartMills <= t)
             while (insulinHi < sortedBoluses.Count && sortedBoluses[insulinHi].Mills <= t)
                 insulinHi++;
@@ -205,7 +202,7 @@ internal sealed class IobCobComputeStage(
 
             var insulinCount = insulinHi - insulinLo;
             var iobResult = insulinCount > 0
-                ? iobCalculator.FromBoluses(sortedBoluses.GetRange(insulinLo, insulinCount), t)
+                ? iobCalculator.FromBoluses(sortedBoluses.GetRange(insulinLo, insulinCount), snapshot, t)
                 : new IobResult { Iob = 0 };
 
             var basalIob = 0.0;
@@ -214,6 +211,7 @@ internal sealed class IobCobComputeStage(
             {
                 var basalResult = iobCalculator.FromTempBasals(
                     sortedTempBasals.GetRange(basalLo, basalCount),
+                    snapshot,
                     t
                 );
                 basalIob = basalResult.BasalIob ?? 0;
@@ -232,6 +230,7 @@ internal sealed class IobCobComputeStage(
                     sortedTempBasals is not null && basalCount > 0
                         ? sortedTempBasals.GetRange(basalLo, basalCount)
                         : null,
+                    snapshot,
                     t
                 )
                 : new CobResult { Cob = 0 };
@@ -300,169 +299,4 @@ internal sealed class IobCobComputeStage(
         return $"iobcob:{TenantCacheId}:{hash}:{roundedStart}:{roundedEnd}:{intervalMinutes}";
     }
 
-    /// <summary>
-    /// Build basal series from TempBasal records.
-    /// TempBasal records are the v4 source of truth for pump-confirmed basal delivery.
-    /// Falls back to profile-based rates when there are gaps in TempBasal data.
-    /// </summary>
-    internal async Task<List<BasalPoint>> BuildBasalSeriesFromTempBasalsAsync(
-        List<TempBasal> tempBasals,
-        long startTime,
-        long endTime,
-        double defaultBasalRate,
-        CancellationToken ct = default
-    )
-    {
-        var series = new List<BasalPoint>();
-        var sorted = tempBasals.OrderBy(tb => tb.StartMills).ToList();
-
-        logger.LogDebug(
-            "Building basal series from {Count} TempBasal records",
-            sorted.Count
-        );
-
-        if (sorted.Count == 0)
-            return await BuildBasalSeriesFromProfileAsync(startTime, endTime, defaultBasalRate, ct);
-
-        long currentTime = startTime;
-
-        var hasData = await therapySettingsResolver.HasDataAsync(ct);
-
-        foreach (var tb in sorted)
-        {
-            var tbStart = tb.StartMills;
-            var tbEnd = tb.EndMills ?? endTime;
-
-            if (tbEnd < startTime || tbStart > endTime)
-                continue;
-
-            tbStart = Math.Max(tbStart, startTime);
-            tbEnd = Math.Min(tbEnd, endTime);
-
-            if (tbStart > currentTime)
-            {
-                series.AddRange(
-                    await BuildBasalSeriesFromProfileAsync(currentTime, tbStart, defaultBasalRate, ct)
-                );
-            }
-
-            var origin = MapTempBasalOrigin(tb.Origin);
-
-            var scheduledRate = tb.ScheduledRate
-                ?? (hasData
-                    ? await basalRateResolver.GetBasalRateAsync(tbStart, ct: ct)
-                    : defaultBasalRate);
-
-            series.Add(
-                new BasalPoint
-                {
-                    Timestamp = tbStart,
-                    Rate = origin == BasalDeliveryOrigin.Suspended ? 0 : tb.Rate,
-                    ScheduledRate = scheduledRate,
-                    Origin = origin,
-                    FillColor = ChartColorMapper.FillFromBasalOrigin(origin),
-                    StrokeColor = ChartColorMapper.StrokeFromBasalOrigin(origin),
-                }
-            );
-
-            currentTime = tbEnd;
-        }
-
-        if (currentTime < endTime)
-            series.AddRange(await BuildBasalSeriesFromProfileAsync(currentTime, endTime, defaultBasalRate, ct));
-
-        if (series.Count == 0)
-        {
-            series.Add(
-                new BasalPoint
-                {
-                    Timestamp = startTime,
-                    Rate = defaultBasalRate,
-                    ScheduledRate = defaultBasalRate,
-                    Origin = BasalDeliveryOrigin.Scheduled,
-                    FillColor = ChartColorMapper.FillFromBasalOrigin(BasalDeliveryOrigin.Scheduled),
-                    StrokeColor = ChartColorMapper.StrokeFromBasalOrigin(
-                        BasalDeliveryOrigin.Scheduled
-                    ),
-                }
-            );
-        }
-
-        return series;
-    }
-
-    internal async Task<List<BasalPoint>> BuildBasalSeriesFromProfileAsync(
-        long startTime,
-        long endTime,
-        double defaultBasalRate,
-        CancellationToken ct = default
-    )
-    {
-        var series = new List<BasalPoint>();
-        const long intervalMs = 5 * 60 * 1000;
-        double? prevRate = null;
-
-        var hasData = await therapySettingsResolver.HasDataAsync(ct);
-
-        for (long t = startTime; t <= endTime; t += intervalMs)
-        {
-            var rate = hasData
-                ? await basalRateResolver.GetBasalRateAsync(t, ct: ct)
-                : defaultBasalRate;
-
-            if (prevRate == null || Math.Abs(rate - prevRate.Value) > 0.001)
-            {
-                series.Add(
-                    new BasalPoint
-                    {
-                        Timestamp = t,
-                        Rate = rate,
-                        ScheduledRate = rate,
-                        Origin = BasalDeliveryOrigin.Inferred,
-                        FillColor = ChartColorMapper.FillFromBasalOrigin(
-                            BasalDeliveryOrigin.Inferred
-                        ),
-                        StrokeColor = ChartColorMapper.StrokeFromBasalOrigin(
-                            BasalDeliveryOrigin.Inferred
-                        ),
-                    }
-                );
-                prevRate = rate;
-            }
-        }
-
-        if (series.Count == 0)
-        {
-            series.Add(
-                new BasalPoint
-                {
-                    Timestamp = startTime,
-                    Rate = defaultBasalRate,
-                    ScheduledRate = defaultBasalRate,
-                    Origin = BasalDeliveryOrigin.Inferred,
-                    FillColor = ChartColorMapper.FillFromBasalOrigin(BasalDeliveryOrigin.Inferred),
-                    StrokeColor = ChartColorMapper.StrokeFromBasalOrigin(
-                        BasalDeliveryOrigin.Inferred
-                    ),
-                }
-            );
-        }
-
-        return series;
-    }
-
-    /// <summary>
-    /// Maps a TempBasalOrigin enum value to the corresponding BasalDeliveryOrigin enum value.
-    /// Both enums have identical members (Algorithm, Scheduled, Manual, Suspended, Inferred).
-    /// </summary>
-    internal static BasalDeliveryOrigin MapTempBasalOrigin(TempBasalOrigin origin) =>
-        origin switch
-        {
-            TempBasalOrigin.Algorithm => BasalDeliveryOrigin.Algorithm,
-            TempBasalOrigin.Scheduled => BasalDeliveryOrigin.Scheduled,
-            TempBasalOrigin.Manual => BasalDeliveryOrigin.Manual,
-            TempBasalOrigin.Suspended => BasalDeliveryOrigin.Suspended,
-            TempBasalOrigin.Inferred => BasalDeliveryOrigin.Inferred,
-            _ => BasalDeliveryOrigin.Scheduled,
-        };
 }

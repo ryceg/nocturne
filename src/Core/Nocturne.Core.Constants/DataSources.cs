@@ -52,6 +52,11 @@ public static class DataSources
     public const string MiniMedConnector = "minimed-connector";
 
     /// <summary>
+    /// Data fetched from Medtronic CareLink via the CareLink connector.
+    /// </summary>
+    public const string CareLinkConnector = "carelink-connector";
+
+    /// <summary>
     /// Data fetched from Glooko API via the Glooko connector.
     /// </summary>
     public const string GlookoConnector = "glooko-connector";
@@ -60,6 +65,11 @@ public static class DataSources
     /// Data bridged from an upstream Nightscout instance via the Nightscout connector.
     /// </summary>
     public const string NightscoutConnector = "nightscout-connector";
+
+    /// <summary>
+    /// Data synced from Gluroo Global Connect's Nightscout-compatible API.
+    /// </summary>
+    public const string GlurooConnector = "gluroo-connector";
 
     /// <summary>
     /// Data fetched from Tidepool API.
@@ -106,6 +116,11 @@ public static class DataSources
     /// Data pulled from a remote Nocturne instance via the NocturneRemote connector.
     /// </summary>
     public const string NocturneRemoteConnector = "nocturne-remote-connector";
+
+    /// <summary>
+    /// Data fetched from Twiist Insight follower API (Omnipod 5 / Tidepool Loop).
+    /// </summary>
+    public const string TwiistConnector = "twiist-connector";
 
     // ============================================================================
     // Manual Entry Sources
@@ -223,13 +238,16 @@ public static class DataSources
             is DexcomConnector
                 or LibreConnector
                 or MiniMedConnector
+                or CareLinkConnector
                 or GlookoConnector
                 or NightscoutConnector
+                or GlurooConnector
                 or TidepoolConnector
                 or TConnectSyncConnector
                 or HomeAssistantConnector
                 or EversenseConnector
-                or NocturneRemoteConnector;
+                or NocturneRemoteConnector
+                or TwiistConnector;
     }
 
     /// <summary>
@@ -288,13 +306,16 @@ public static class DataSources
             DexcomConnector,
             LibreConnector,
             MiniMedConnector,
+            CareLinkConnector,
             GlookoConnector,
             NightscoutConnector,
+            GlurooConnector,
             TidepoolConnector,
             TConnectSyncConnector,
             HomeAssistantConnector,
             EversenseConnector,
             NocturneRemoteConnector,
+            TwiistConnector,
             XDrip,
             Spike,
             ManualEntry,

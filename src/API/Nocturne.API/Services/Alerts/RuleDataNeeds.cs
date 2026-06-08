@@ -177,15 +177,26 @@ public static class RuleDataNeeds
             case AlertConditionType.UploaderBattery: b.UploaderStatus = true; break;
             case AlertConditionType.OverrideActive: b.Override = true; break;
             case AlertConditionType.SensitivityRatio: b.SensitivityRatio = true; break;
-            case AlertConditionType.GlucoseBucket: b.GlucoseBucket = true; break;
+            case AlertConditionType.GlucoseBucket:
+                b.GlucoseBucket = true;
+                // Glucose-bucket resolution maps a UTC `at` into the tenant's local
+                // wall-clock to pick the right schedule entry, so the enricher must fetch
+                // the tenant timezone. Without this co-fetch the resolver silently falls
+                // back to UTC and picks the wrong target-range entry.
+                b.TenantTimeZone = true;
+                break;
             // Carb/bolus times are derived from the same treatment fetch; one flag covers both.
             case AlertConditionType.TimeSinceLastCarb: b.Treatments = true; break;
             case AlertConditionType.TimeSinceLastBolus: b.Treatments = true; break;
             case AlertConditionType.DayOfWeek: b.TenantTimeZone = true; break;
+            // TimeOfDay falls back to the tenant timezone when the rule's own Timezone is
+            // null (the default the UI saves), so the enricher must populate it. Without
+            // this co-fetch the evaluator would silently fall back to UTC.
+            case AlertConditionType.TimeOfDay: b.TenantTimeZone = true; break;
             case AlertConditionType.PumpState: /* handled in VisitTopLevel/VisitNode */ break;
             case AlertConditionType.StateSpanActive: /* handled in VisitTopLevel/VisitNode */ break;
             // DoNotDisturb deliberately not handled here — see DataNeedsSet docs above.
-            // Threshold, RateOfChange, SignalLoss, Staleness, TimeOfDay, Composite, Not, Sustained
+            // Threshold, RateOfChange, SignalLoss, Staleness, Composite, Not, Sustained
             // require no extra context — handled by base SensorContext or recursed by VisitNode.
         }
     }

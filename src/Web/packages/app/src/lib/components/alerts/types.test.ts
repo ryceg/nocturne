@@ -54,6 +54,17 @@ describe("defaultPayload", () => {
 		expect(node.composite?.conditions).toHaveLength(1);
 		expect(node.composite?.conditions[0].type).toBe("threshold");
 	});
+
+	it("time_of_day default carries the browser's resolved IANA timezone", () => {
+		// The user picks "10am-2pm" on their device — they mean local wall-clock. Saving
+		// the rule without a timezone made the backend interpret the window as UTC, firing
+		// at the wrong hour for non-UTC users. The editor now stamps the browser tz at
+		// creation time so the rule JSON is self-documenting on the wire.
+		const node = defaultPayload("time_of_day");
+		const expected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		expect(node.time_of_day?.timezone).toBe(expected);
+		expect(expected).toBeTruthy();
+	});
 });
 
 describe("nodeFromApi / nodeToApi", () => {

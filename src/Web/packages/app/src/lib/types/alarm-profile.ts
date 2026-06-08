@@ -424,7 +424,7 @@ export function createDefaultAlarmProfile(
     visual: {
       screenFlash: type === "UrgentHigh" || type === "UrgentLow",
       flashColor: defaults.flashColor,
-      flashIntervalMs: 500,
+      flashIntervalMs: 1000,
       persistentBanner: true,
       wakeScreen: true,
       showEmergencyContacts: type === "UrgentHigh" || type === "UrgentLow",

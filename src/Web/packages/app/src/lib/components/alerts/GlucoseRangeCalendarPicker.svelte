@@ -107,20 +107,30 @@
   });
 
   type EntriesByDate = Record<string, { mills: number; mgdl: number }[]>;
-  const entriesPromise = $derived.by<Promise<EntriesByDate>>(() => {
-    const startDate = startOfMonth(viewMonth).toDate(tz);
-    const endDate = endOfMonth(viewMonth).toDate(tz);
-    return getPunchCardData({ startDate, endDate }).then((data) => {
-      const out: EntriesByDate = {};
-      for (const m of data?.months ?? []) {
-        for (const d of m.days ?? []) {
-          if (d.date && d.entries && d.entries.length > 0) {
-            out[d.date] = d.entries;
-          }
+  // Use the QueryResult reactively rather than awaiting a fresh Promise on
+  // each derivation: SvelteKit's query() dedupes by serialized args, so
+  // re-opening the popover with the same viewMonth resolves synchronously
+  // from `.current` instead of flicking back through a loading state.
+  const punchCardQuery = $derived(
+    getPunchCardData({
+      startDate: startOfMonth(viewMonth).toDate(tz),
+      endDate: endOfMonth(viewMonth).toDate(tz),
+    })
+  );
+  const entriesByDate = $derived.by<EntriesByDate>(() => {
+    const data = punchCardQuery.current;
+    const out: EntriesByDate = {};
+    for (const m of data?.months ?? []) {
+      for (const d of m.days ?? []) {
+        if (d.date && d.entries && d.entries.length > 0) {
+          out[d.date] = d.entries.map((e) => ({
+            mills: e.mills ?? 0,
+            mgdl: e.mgdl ?? 0,
+          }));
         }
       }
-      return out;
-    });
+    }
+    return out;
   });
 
   function isFuture(d: DateValue): boolean {
@@ -210,28 +220,6 @@
   }
 </script>
 
-{#snippet grid(entriesByDate: EntriesByDate)}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="grid grid-cols-7 gap-1" onmouseleave={onMouseLeave}>
-    {#each gridDays as { date, inMonth } (dateKey(date))}
-      {@const entries = entriesByDate[dateKey(date)] ?? []}
-      <div onmouseenter={() => onCellHover(date)}>
-        <GlucosePickerCell
-          {date}
-          {entries}
-          {inMonth}
-          disabled={isFuture(date)}
-          isStart={isRangeStart(date)}
-          isEnd={isRangeEnd(date)}
-          inRange={isInRange(date)}
-          {locale}
-          onclick={() => pick(date)}
-        />
-      </div>
-    {/each}
-  </div>
-{/snippet}
-
 <div class="p-3 w-[480px]">
   <div class="flex items-center justify-between mb-2">
     <Button
@@ -250,11 +238,11 @@
           Click end date
         </span>
       {/if}
-      {#await entriesPromise}
+      {#if punchCardQuery.loading}
         <span class="ml-2 text-xs text-muted-foreground font-normal">
           loading…
         </span>
-      {/await}
+      {/if}
     </div>
     <Button
       variant="ghost"
@@ -276,11 +264,23 @@
     {/each}
   </div>
 
-  {#await entriesPromise}
-    {@render grid({})}
-  {:then entriesByDate}
-    {@render grid(entriesByDate)}
-  {:catch}
-    {@render grid({})}
-  {/await}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="grid grid-cols-7 gap-1" onmouseleave={onMouseLeave}>
+    {#each gridDays as { date, inMonth } (dateKey(date))}
+      {@const entries = entriesByDate[dateKey(date)] ?? []}
+      <div onmouseenter={() => onCellHover(date)}>
+        <GlucosePickerCell
+          {date}
+          {entries}
+          {inMonth}
+          disabled={isFuture(date)}
+          isStart={isRangeStart(date)}
+          isEnd={isRangeEnd(date)}
+          inRange={isInRange(date)}
+          {locale}
+          onclick={() => pick(date)}
+        />
+      </div>
+    {/each}
+  </div>
 </div>

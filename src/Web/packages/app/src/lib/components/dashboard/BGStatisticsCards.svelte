@@ -13,8 +13,8 @@
     BatteryWarning,
     Zap,
   } from "lucide-svelte";
-  import { formatTime, timeAgo } from "$lib/utils";
-  import { formatGlucoseDelta, getUnitLabel } from "$lib/utils/formatting";
+  import { timeAgo } from "$lib/utils";
+  import { formatGlucoseDelta, getUnitLabel, time } from "$lib/utils/formatting";
   import { getRealtimeStore } from "$lib/stores/realtime-store.svelte";
   import { glucoseUnits } from "$lib/stores/appearance-store.svelte";
   import WebSocketStatus from "$lib/components/WebSocketStatus.svelte";
@@ -63,7 +63,8 @@
   }
 </script>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="@container">
+<div class="grid grid-cols-1 @lg:grid-cols-3 gap-4">
   <Card>
     <CardHeader class="pb-2">
       <CardTitle class="text-sm font-medium">BG Delta</CardTitle>
@@ -87,7 +88,7 @@
           {timeAgo(displayLastUpdated)}
         </div>
         <p class="text-xs text-muted-foreground">
-          {formatTime(displayLastUpdated)}
+          {time(displayLastUpdated)}
         </p>
       </CardContent>
     </Card>
@@ -131,7 +132,7 @@
           </div>
         {:else}
           <p class="text-xs text-muted-foreground">
-            {formatTime(displayLastUpdated)}
+            {time(displayLastUpdated)}
           </p>
         {/if}
       </CardContent>
@@ -146,7 +147,7 @@
           {timeAgo(displayLastUpdated)}
         </div>
         <p class="text-xs text-muted-foreground">
-          {formatTime(displayLastUpdated)}
+          {time(displayLastUpdated)}
         </p>
       </CardContent>
     </Card>
@@ -155,4 +156,5 @@
   {#if showWebSocketStatus}
     <WebSocketStatus />
   {/if}
+</div>
 </div>

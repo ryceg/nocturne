@@ -126,7 +126,13 @@ public class GlookoTempBasalMapper
                 );
             }
 
-        // ScheduledBasal -> TempBasal with actual rate, origin=Scheduled
+        // ScheduledBasal -> TempBasal with actual delivered rate, origin=Scheduled.
+        // Tandem Control-IQ (and similar algorithmic pumps) report algorithm-driven adjustments
+        // through this same stream — the connector cannot tell algorithm output from a true
+        // schedule rate without consulting the user's programmed basal_schedules. The
+        // ingest-side publisher reclassifies these to Algorithm and resolves the correct
+        // ScheduledRate when the delivered rate diverges from the programmed schedule, so we
+        // leave ScheduledRate null here rather than asserting "delivered == scheduled".
         if (series.ScheduledBasal != null)
             foreach (var basal in series.ScheduledBasal.Where(b => !b.Interpolated))
             {
@@ -146,7 +152,7 @@ public class GlookoTempBasalMapper
                         StartTimestamp = startTimestamp,
                         EndTimestamp = endTimestamp,
                         Rate = rate,
-                        ScheduledRate = rate,
+                        ScheduledRate = null,
                         Origin = TempBasalOrigin.Scheduled,
                         Device = null,
                         App = null,
@@ -222,7 +228,9 @@ public class GlookoTempBasalMapper
                 );
             }
 
-        // ScheduledBasals -> origin=Scheduled
+        // ScheduledBasals -> origin=Scheduled. See note on the v3 path above:
+        // ScheduledRate is left null so the publisher can resolve it from the user's
+        // programmed basal_schedules and reclassify algorithm-driven adjustments.
         if (batchData.ScheduledBasals != null)
             foreach (var basal in batchData.ScheduledBasals)
             {
@@ -258,7 +266,7 @@ public class GlookoTempBasalMapper
                         StartTimestamp = startTimestamp,
                         EndTimestamp = endTimestamp,
                         Rate = rate,
-                        ScheduledRate = rate,
+                        ScheduledRate = null,
                         Origin = TempBasalOrigin.Scheduled,
                         Device = null,
                         App = null,

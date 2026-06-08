@@ -1857,12 +1857,57 @@ public class StatisticsService : IStatisticsService
     }
 
     /// <summary>
-    /// Calculate the insulin delivered (units) for a single TempBasal record.
-    /// duration = (EndMills ?? StartMills + 5 min) - StartMills, converted to hours.
+    /// Groups TempBasals by device, sorts each group by start time, and clips each record's
+    /// effective end to the next record's start within the same device group. This corrects
+    /// the over-counting that occurs with loop/AID systems (Trio, AndroidAPS, Loop) that
+    /// write a new TempBasal every ~5 minutes with a 30–120 min declared duration — each new
+    /// record cancels the previous on the pump, so only the actual inter-record window was
+    /// delivered.
     /// </summary>
-    internal static double GetTempBasalInsulin(TempBasal tb)
+    /// <remarks>
+    /// Grouping is by <c>DeviceId?.ToString() ?? Device ?? string.Empty</c> so records from
+    /// different physical devices (e.g. Tidepool history alongside Trio loop data) are clipped
+    /// independently. Records from different devices must not truncate each other.
+    ///
+    /// The last record in each device group keeps its declared end unchanged.
+    /// Zero-duration records (identical start times, or clipped to their own start) are
+    /// returned with <c>EffectiveEndMills == StartMills</c> and are discarded by the
+    /// <c>insulin &lt;= 0</c> guards in callers.
+    /// </remarks>
+    internal static IReadOnlyList<(TempBasal Tb, long EffectiveEndMills)> ClipOverlappingTempBasals(
+        IEnumerable<TempBasal> tempBasals)
     {
-        var endMills = tb.EndMills ?? tb.StartMills + (5 * 60 * 1000); // Default 5 min
+        var result = new List<(TempBasal Tb, long EffectiveEndMills)>();
+
+        var groups = tempBasals
+            .GroupBy(tb => tb.DeviceId?.ToString() ?? tb.Device ?? string.Empty);
+
+        foreach (var group in groups)
+        {
+            var sorted = group.OrderBy(tb => tb.StartMills).ToList();
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                var tb = sorted[i];
+                var declaredEnd = tb.EndMills ?? tb.StartMills + (5 * 60_000L);
+                var effectiveEnd = i < sorted.Count - 1
+                    ? Math.Min(declaredEnd, sorted[i + 1].StartMills)
+                    : declaredEnd;
+                result.Add((tb, effectiveEnd));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Calculate the insulin delivered (units) for a single TempBasal record.
+    /// When <paramref name="effectiveEndMills"/> is provided (from
+    /// <see cref="ClipOverlappingTempBasals"/>), it overrides the record's declared end.
+    /// Otherwise falls back to <c>EndMills ?? StartMills + 5 min</c>.
+    /// </summary>
+    internal static double GetTempBasalInsulin(TempBasal tb, long? effectiveEndMills = null)
+    {
+        var endMills = effectiveEndMills ?? tb.EndMills ?? tb.StartMills + (5 * 60 * 1000);
         var durationHours = (endMills - tb.StartMills) / (1000.0 * 60 * 60);
         return tb.Rate * durationHours;
     }
@@ -1886,9 +1931,9 @@ public class StatisticsService : IStatisticsService
         var tempBasalInsulin = 0.0;
         var scheduledBasalInsulin = 0.0;
         var additionalBasalInsulin = 0.0;
-        foreach (var tb in tempBasals)
+        foreach (var (tb, effectiveEndMills) in ClipOverlappingTempBasals(tempBasals))
         {
-            var insulin = GetTempBasalInsulin(tb);
+            var insulin = GetTempBasalInsulin(tb, effectiveEndMills);
             if (insulin <= 0)
                 continue;
             tempBasalInsulin += insulin;
@@ -1896,8 +1941,7 @@ public class StatisticsService : IStatisticsService
             // Split into scheduled vs additional using ScheduledRate when available
             if (tb.ScheduledRate.HasValue)
             {
-                var endMills = tb.EndMills ?? tb.StartMills + (5 * 60 * 1000);
-                var durationHours = (endMills - tb.StartMills) / (1000.0 * 60 * 60);
+                var durationHours = (effectiveEndMills - tb.StartMills) / (1000.0 * 60 * 60);
                 var scheduled = tb.ScheduledRate.Value * durationHours;
                 scheduledBasalInsulin += scheduled;
                 additionalBasalInsulin += insulin - scheduled;
@@ -1966,10 +2010,10 @@ public class StatisticsService : IStatisticsService
             dailyData[dateKey] = (currentBasal, currentBolus + bolus.Insulin);
         }
 
-        // Process TempBasals
-        foreach (var tb in tempBasals)
+        // Process TempBasals — clip overlapping records (loop systems write every ~5 min with longer declared duration)
+        foreach (var (tb, effectiveEndMills) in ClipOverlappingTempBasals(tempBasals))
         {
-            var basalInsulin = GetTempBasalInsulin(tb);
+            var basalInsulin = GetTempBasalInsulin(tb, effectiveEndMills);
             if (basalInsulin <= 0)
                 continue;
 
@@ -2060,7 +2104,7 @@ public class StatisticsService : IStatisticsService
     )
     {
         var tz = userTimeZone ?? TimeZoneInfo.Utc;
-        var tempBasalList = tempBasals.ToList();
+        var tempBasalList = ClipOverlappingTempBasals(tempBasals);
         var dayCount = Math.Max(1, (int)Math.Ceiling((endDate - startDate).TotalDays));
 
         var allRates = new List<double>();
@@ -2074,15 +2118,16 @@ public class StatisticsService : IStatisticsService
         var hourlyRates = new List<(double Rate, long WeightMs)>[24];
         for (int h = 0; h < 24; h++) hourlyRates[h] = new();
 
-        foreach (var tb in tempBasalList)
+        foreach (var (tb, effectiveEndMills) in tempBasalList)
         {
+            // Skip zero-duration records (e.g. exact cross-source duplicates clipped to zero)
+            if (effectiveEndMills <= tb.StartMills)
+                continue;
+
             var rate = tb.Rate;
             allRates.Add(rate);
-            totalDelivered += GetTempBasalInsulin(tb);
+            totalDelivered += GetTempBasalInsulin(tb, effectiveEndMills);
 
-            // Effective interval: open-ended TempBasals fall back to a 5-min slice (matches
-            // GetTempBasalInsulin's convention), so the weight isn't zero.
-            var effectiveEndMills = tb.EndMills ?? tb.StartMills + 5 * 60_000L;
             DistributeAcrossHourOfDay(tb.StartMills, effectiveEndMills, rate, tz, hourlyRates);
 
             if (tb.Origin != TempBasalOrigin.Scheduled && tb.Origin != TempBasalOrigin.Inferred)

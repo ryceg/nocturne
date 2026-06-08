@@ -35,7 +35,7 @@
     ArrowDown,
     Trash2,
   } from "lucide-svelte";
-  import { formatDateTimeCompact } from "$lib/utils/formatting";
+  import { formatDateTimeCompact, bg, bgLabel } from "$lib/utils/formatting";
   import { ENTRY_CATEGORIES } from "$lib/constants/entry-categories";
   import DataTableToolbar from "./DataTableToolbar.svelte";
   import DataTablePagination from "./DataTablePagination.svelte";
@@ -69,6 +69,7 @@
     bgCheck: "BG Check",
     note: "Note",
     deviceEvent: "Device Event",
+    basalInjection: "Long-acting injection",
   };
 
   // Compute unique sources from data
@@ -106,7 +107,7 @@
       case "carbs":
         return formatNumber(record.data.carbs, "g");
       case "bgCheck":
-        return formatNumber(record.data.mgdl, " mg/dL");
+        return record.data.mgdl != null ? `${bg(record.data.mgdl)} ${bgLabel()}` : "\u2014";
       case "note":
         return record.data.text
           ? record.data.text.length > 40
@@ -115,6 +116,8 @@
           : "\u2014";
       case "deviceEvent":
         return record.data.eventType ?? "\u2014";
+      case "basalInjection":
+        return formatNumber(record.data.units, "U");
     }
   }
 
@@ -143,6 +146,8 @@
             ? record.data.notes.slice(0, 30) + "\u2026"
             : record.data.notes
           : "\u2014";
+      case "basalInjection":
+        return record.data.insulinContext?.insulinName ?? "\u2014";
     }
   }
 
@@ -333,6 +338,10 @@
           if (r.data.eventType) values.push(r.data.eventType);
           if (r.data.notes) values.push(r.data.notes);
           break;
+        case "basalInjection":
+          if (r.data.insulinContext?.insulinName) values.push(r.data.insulinContext.insulinName);
+          if (r.data.notes) values.push(r.data.notes);
+          break;
       }
 
       if (r.data.dataSource) values.push(r.data.dataSource);
@@ -445,7 +454,7 @@
   <Checkbox
     {checked}
     {indeterminate}
-    onCheckedChange={(value) => t.toggleAllPageRowsSelected(!!value)}
+    onCheckedChange={(value: boolean) => t.toggleAllPageRowsSelected(!!value)}
     aria-label="Select all"
   />
 {/snippet}
@@ -453,7 +462,7 @@
 {#snippet selectCellSnippet({ checked, row }: { checked: boolean; row: any })}
   <Checkbox
     {checked}
-    onCheckedChange={(value) => row.toggleSelected(!!value)}
+    onCheckedChange={(value: boolean) => row.toggleSelected(!!value)}
     aria-label="Select row"
   />
 {/snippet}

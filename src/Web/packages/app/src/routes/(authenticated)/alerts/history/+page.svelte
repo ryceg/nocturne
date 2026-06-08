@@ -11,7 +11,8 @@
     CardTitle,
   } from "$lib/components/ui/card";
   import { ArrowLeft, History as HistoryIcon, Loader2 } from "lucide-svelte";
-  import { formatDuration, formatDateTime } from "$lib/components/alerts/alertTime";
+  import { formatDuration } from "$lib/components/alerts/alertTime";
+  import { formatDateTimeCompact } from "$lib/utils/formatting";
 
   let page = $state(1);
   const historyQuery = $derived(getAlertHistory({ page, pageSize: 25 }));
@@ -19,7 +20,7 @@
 
 <svelte:head><title>Alert history · Nocturne</title></svelte:head>
 
-<div class="container mx-auto max-w-4xl p-4 lg:p-6 space-y-6">
+<div class="@container container mx-auto max-w-4xl p-3 @md:p-6 space-y-6">
   <div class="flex items-center gap-2">
     <Button
       type="button"
@@ -125,7 +126,7 @@
         {/if}
       </div>
       <div class="text-xs text-muted-foreground">
-        {formatDateTime(h.startedAt) || "—"}{#if h.endedAt} → {formatDateTime(h.endedAt) || "—"}{/if} · {formatDuration(h.startedAt, h.endedAt) || "—"}
+        {formatDateTimeCompact(h.startedAt) || "—"}{#if h.endedAt} → {formatDateTimeCompact(h.endedAt) || "—"}{/if} · {formatDuration(h.startedAt, h.endedAt) || "—"}
       </div>
     </div>
   </div>

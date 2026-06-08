@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Mappers.V4;
+using Nocturne.Infrastructure.Data.Services;
 
 namespace Nocturne.Infrastructure.Data.Repositories.V4;
 
@@ -11,19 +12,19 @@ namespace Nocturne.Infrastructure.Data.Repositories.V4;
 /// </summary>
 public class PatientRecordRepository : IPatientRecordRepository
 {
-    private readonly NocturneDbContext _context;
+    private readonly ITenantDbContextFactory _contextFactory;
     private readonly ILogger<PatientRecordRepository> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PatientRecordRepository"/> class.
     /// </summary>
-    /// <param name="context">The database context.</param>
+    /// <param name="contextFactory">The tenant database context factory.</param>
     /// <param name="logger">The logger instance.</param>
     public PatientRecordRepository(
-        NocturneDbContext context,
+        ITenantDbContextFactory contextFactory,
         ILogger<PatientRecordRepository> logger)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _logger = logger;
     }
 
@@ -34,7 +35,8 @@ public class PatientRecordRepository : IPatientRecordRepository
     /// <returns>The patient record, or null if none exists.</returns>
     public async Task<PatientRecord?> GetAsync(CancellationToken ct = default)
     {
-        var entity = await _context.PatientRecords
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PatientRecords
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
 
@@ -48,7 +50,8 @@ public class PatientRecordRepository : IPatientRecordRepository
     /// <returns>The patient record.</returns>
     public async Task<PatientRecord> GetOrCreateAsync(CancellationToken ct = default)
     {
-        var entity = await _context.PatientRecords.FirstOrDefaultAsync(ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PatientRecords.FirstOrDefaultAsync(ct);
 
         if (entity is not null)
             return PatientRecordMapper.ToDomainModel(entity);
@@ -63,8 +66,8 @@ public class PatientRecordRepository : IPatientRecordRepository
         };
 
         var newEntity = PatientRecordMapper.ToEntity(model);
-        _context.PatientRecords.Add(newEntity);
-        await _context.SaveChangesAsync(ct);
+        ctx.PatientRecords.Add(newEntity);
+        await ctx.SaveChangesAsync(ct);
 
         return PatientRecordMapper.ToDomainModel(newEntity);
     }
@@ -77,11 +80,12 @@ public class PatientRecordRepository : IPatientRecordRepository
     /// <returns>The updated patient record.</returns>
     public async Task<PatientRecord> UpdateAsync(PatientRecord model, CancellationToken ct = default)
     {
-        var entity = await _context.PatientRecords.FirstOrDefaultAsync(ct)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.PatientRecords.FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Patient record not found");
 
         PatientRecordMapper.UpdateEntity(entity, model);
-        await _context.SaveChangesAsync(ct);
+        await ctx.SaveChangesAsync(ct);
 
         return PatientRecordMapper.ToDomainModel(entity);
     }

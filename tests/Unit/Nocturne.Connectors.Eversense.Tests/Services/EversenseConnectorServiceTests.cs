@@ -106,9 +106,9 @@ public class EversenseConnectorServiceTests
     #region AuthenticateAsync Tests
 
     [Fact]
-    public async Task AuthenticateAsync_WhenTokenProviderReturnsToken_ReturnsTrue()
+    public async Task AuthenticateAsync_ReturnsTrue()
     {
-        // Arrange
+        // Arrange — AuthenticateAsync is a legacy no-op; actual auth happens per-tenant in sync flow
         var fixture = new ServiceFixture(tokenToReturn: "valid-token");
 
         // Act
@@ -117,20 +117,6 @@ public class EversenseConnectorServiceTests
         // Assert
         result.Should().BeTrue();
         fixture.Service.FailedRequestCount.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task AuthenticateAsync_WhenTokenProviderReturnsNull_ReturnsFalse()
-    {
-        // Arrange
-        var fixture = new ServiceFixture(tokenToReturn: null);
-
-        // Act
-        var result = await fixture.Service.AuthenticateAsync();
-
-        // Assert
-        result.Should().BeFalse();
-        fixture.Service.FailedRequestCount.Should().Be(1);
     }
 
     #endregion
@@ -345,27 +331,33 @@ public class EversenseConnectorServiceTests
 
         public FakeEversenseAuthTokenProvider(string? tokenToReturn)
             : base(
-                Options.Create(new EversenseConnectorConfiguration
-                {
-                    Username = "test@example.com",
-                    Password = "test-password",
-                }),
                 new HttpClient(),
+                new Nocturne.Connectors.Core.Services.ConnectorTokenCache(),
+                new Nocturne.Connectors.Core.Services.ConnectorServerResolver<EversenseConnectorConfiguration>(null, null, null),
+                new FakeTenantAccessor(),
                 NullLogger<EversenseAuthTokenProvider>.Instance,
                 Mock.Of<IRetryDelayStrategy>())
         {
             _tokenToReturn = tokenToReturn;
         }
 
-        protected override Task<(string? Token, DateTime ExpiresAt)> AcquireTokenAsync(
-            CancellationToken cancellationToken)
+        protected override Task<(string? Token, DateTime ExpiresAt, IReadOnlyDictionary<string, string>? Metadata)> AcquireTokenAsync(
+            EversenseConnectorConfiguration config, CancellationToken cancellationToken)
         {
             if (_tokenToReturn != null)
-                return Task.FromResult<(string? Token, DateTime ExpiresAt)>(
-                    (_tokenToReturn, DateTime.UtcNow.AddHours(1)));
+                return Task.FromResult<(string? Token, DateTime ExpiresAt, IReadOnlyDictionary<string, string>? Metadata)>(
+                    (_tokenToReturn, DateTime.UtcNow.AddHours(1), null));
 
-            return Task.FromResult<(string? Token, DateTime ExpiresAt)>(
-                (null, DateTime.MinValue));
+            return Task.FromResult<(string? Token, DateTime ExpiresAt, IReadOnlyDictionary<string, string>? Metadata)>(
+                (null, DateTime.MinValue, null));
+        }
+
+        private class FakeTenantAccessor : Nocturne.Core.Contracts.Multitenancy.ITenantAccessor
+        {
+            public bool IsResolved => true;
+            public Guid TenantId => Guid.Empty;
+            public Nocturne.Core.Contracts.Multitenancy.TenantContext? Context => null;
+            public void SetTenant(Nocturne.Core.Contracts.Multitenancy.TenantContext context) { }
         }
     }
 
@@ -430,6 +422,7 @@ public class EversenseConnectorServiceTests
 
             Service = new EversenseConnectorService(
                 httpClient,
+                new Nocturne.Connectors.Core.Services.ConnectorServerResolver<EversenseConnectorConfiguration>(null, null, null),
                 logger,
                 retryStrategy,
                 tokenProvider,

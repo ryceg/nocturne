@@ -13,7 +13,7 @@ env:
   IMAGE_REPOSITORY: ${{ github.repository }}
   DOTNET_VERSION: "10.0.x"
   NODE_VERSION: "24"
-  PNPM_VERSION: "9"
+  PNPM_VERSION: "10"
 
 jobs:
   build-and-push:
@@ -75,7 +75,7 @@ jobs:
             DOCKER_TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/nocturne-web:${VERSION}"
           elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
-            DOTNET_TAGS="${VERSION};latest"
+            DOTNET_TAGS="${VERSION}"
             DOCKER_TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/nocturne-web:${VERSION},${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/nocturne-web:latest"
           elif [[ "${{ github.ref }}" == refs/heads/master ]] || [[ "${{ github.ref }}" == refs/heads/main ]]; then
             VERSION=latest
@@ -138,6 +138,26 @@ jobs:
             -p:ContainerRepository=${{ env.IMAGE_REPOSITORY }}/nocturne-api \
             "-p:ContainerImageTags=${{ steps.version.outputs.dotnet_tags }}"
 
+      - name: Build and push Nocturne.Services.Demo container
+        if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
+        working-directory: src/Services/Nocturne.Services.Demo
+        run: |
+          dotnet publish \
+            -c Release \
+            -p:PublishProfile=DefaultContainer \
+            -p:ContainerRegistry=${{ env.REGISTRY }} \
+            -p:ContainerRepository=${{ env.IMAGE_REPOSITORY }}/nocturne-demo \
+            "-p:ContainerImageTags=${{ steps.version.outputs.dotnet_tags }}"
+
+      - name: Tag dotnet containers as latest
+        if: startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
+        run: |
+          for image in nocturne-api nocturne-demo; do
+            docker buildx imagetools create \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/${image}:latest \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/${image}:${{ steps.version.outputs.version }}
+          done
+
       - name: Build and push Nocturne.Web container
         if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
         run: |
@@ -159,6 +179,7 @@ jobs:
           set -euo pipefail
           images=(
             "nocturne-api"
+            "nocturne-demo"
             "nocturne-web"
           )
 
@@ -175,6 +196,7 @@ jobs:
           set +e
           images=(
             "nocturne-api"
+            "nocturne-demo"
             "nocturne-web"
           )
 
@@ -198,6 +220,7 @@ jobs:
             echo "### Container Image Tags"
             echo ""
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/nocturne-api:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/nocturne-demo:${{ steps.version.outputs.version }}\`"
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/nocturne-web:${{ steps.version.outputs.version }}\`"
             echo ""
             if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
@@ -240,6 +263,11 @@ jobs:
                     image: "nocturne-api",
                     status: "missing",
                     ref: `${registry}/${imageRepo}/nocturne-api:${tag}`,
+                  },
+                  {
+                    image: "nocturne-demo",
+                    status: "missing",
+                    ref: `${registry}/${imageRepo}/nocturne-demo:${tag}`,
                   },
                   {
                     image: "nocturne-web",

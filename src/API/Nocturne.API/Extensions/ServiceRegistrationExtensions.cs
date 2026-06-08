@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Fido2NetLib;
+using Nocturne.API.Authorization;
 using Nocturne.API.Configuration;
 using Nocturne.API.Services;
 using Nocturne.API.Middleware.Handlers;
@@ -60,6 +61,7 @@ using Nocturne.Core.Contracts.V4;
 using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models;
 using Nocturne.Core.Models.Configuration;
+using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Abstractions;
 using Nocturne.Infrastructure.Data.Repositories;
 using Nocturne.Infrastructure.Data.Repositories.V4;
@@ -185,6 +187,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IOAuthTokenService, OAuthTokenService>();
         services.AddScoped<IOAuthDeviceCodeService, OAuthDeviceCodeService>();
         services.AddScoped<IMemberInviteService, MemberInviteService>();
+        services.AddScoped<IMembershipRequestService, MembershipRequestService>();
         services.AddScoped<IGuestLinkService, GuestLinkService>();
         services.AddSingleton<IOAuthTokenRevocationCache, OAuthTokenRevocationCache>();
         services.AddHostedService<OAuthCodeCleanupService>();
@@ -192,6 +195,10 @@ public static class ServiceRegistrationExtensions
         services.AddHostedService<AuthorizationSeedService>();
 
         services.AddSingleton<PublicAccessCacheService>();
+        services.AddSingleton<ShareTokenCacheService>();
+        services.AddSingleton<IShareTokenGenerator, ShareTokenGenerator>();
+        services.AddScoped<IShareLinkService, ShareLinkService>();
+        services.AddHostedService<ShareTokenBackfillService>();
 
         // Passkey (WebAuthn/FIDO2) services
         services.AddScoped<IPasskeyService, PasskeyService>();
@@ -228,7 +235,12 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ITenantRoleService, TenantRoleService>();
         services.AddScoped<ITenantService, TenantService>();
 
+        // Shared by InstanceKeyHandler (authentication) and TenantSetupMiddleware
+        // (setup-gate bypass) so instance-key validation rules live in one place.
+        services.AddSingleton<IInstanceKeyValidator, InstanceKeyValidator>();
+
         // Auth handlers (executed in priority order, lowest first)
+        services.AddSingleton<IAuthHandler, PlatformAccessCookieHandler>(); // Priority 40
         services.AddSingleton<IAuthHandler, SessionCookieHandler>(); // Priority 50
         services.AddSingleton<IAuthHandler, GuestSessionHandler>(); // Priority 52
         services.AddSingleton<GuestSessionHandler>(); // For direct cookie-setting use
@@ -393,12 +405,18 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ITreatmentCache, Nocturne.API.Services.Treatments.TreatmentCacheAdapter>();
         services.AddScoped<SignalRTreatmentEventSink>();
         services.AddScoped<IDataEventSink<Treatment>>(sp =>
-            new CompositeDataEventSink<Treatment>(
-                [
-                    sp.GetRequiredService<SignalRTreatmentEventSink>(),
-                    sp.GetRequiredService<NightscoutTreatmentWriteBackSink>()
-                ],
-                sp.GetService<ILogger<CompositeDataEventSink<Treatment>>>()));
+        {
+            var sinks = new List<IDataEventSink<Treatment>>
+            {
+                sp.GetRequiredService<SignalRTreatmentEventSink>(),
+            };
+            var writeBack = sp.GetService<NightscoutTreatmentWriteBackSink>();
+            if (writeBack is not null) sinks.Add(writeBack);
+
+            return new CompositeDataEventSink<Treatment>(
+                sinks,
+                sp.GetService<ILogger<CompositeDataEventSink<Treatment>>>());
+        });
         services.AddScoped<IWriteSideEffects, WriteSideEffectsService>();
         services.AddScoped<IEntryService, EntryService>();
         services.AddScoped<IEntryStore, Nocturne.API.Services.Entries.EntryReadService>();
@@ -409,19 +427,39 @@ public static class ServiceRegistrationExtensions
             var sinks = new List<IDataEventSink<Entry>>
             {
                 sp.GetRequiredService<SignalREntryEventSink>(),
-                sp.GetRequiredService<NightscoutEntryWriteBackSink>()
             };
+            var writeBack = sp.GetService<NightscoutEntryWriteBackSink>();
+            if (writeBack is not null) sinks.Add(writeBack);
 
             return new CompositeDataEventSink<Entry>(
                 sinks,
                 sp.GetService<ILogger<CompositeDataEventSink<Entry>>>());
         });
+        // V4-native sensor glucose writes (POST /api/v4/glucose/sensor + connector publisher)
+        // broadcast on the real-time "entries" collection, mirroring the legacy entries path.
+        services.AddScoped<SignalRSensorGlucoseEventSink>();
+        services.AddScoped<IDataEventSink<SensorGlucose>>(sp =>
+        {
+            var sinks = new List<IDataEventSink<SensorGlucose>>
+            {
+                sp.GetRequiredService<SignalRSensorGlucoseEventSink>(),
+            };
+
+            return new CompositeDataEventSink<SensorGlucose>(
+                sinks,
+                sp.GetService<ILogger<CompositeDataEventSink<SensorGlucose>>>());
+        });
         services.AddScoped<IStateSpanService, StateSpanService>();
         services.AddScoped<DeviceStatusProjectionService>();
         services.AddScoped<IDataEventSink<DeviceStatus>>(sp =>
-            new CompositeDataEventSink<DeviceStatus>(
-                [sp.GetRequiredService<NightscoutDeviceStatusWriteBackSink>()],
-                sp.GetService<ILogger<CompositeDataEventSink<DeviceStatus>>>()));
+        {
+            var sinks = new List<IDataEventSink<DeviceStatus>>();
+            var writeBack = sp.GetService<NightscoutDeviceStatusWriteBackSink>();
+            if (writeBack is not null) sinks.Add(writeBack);
+            return new CompositeDataEventSink<DeviceStatus>(
+                sinks,
+                sp.GetService<ILogger<CompositeDataEventSink<DeviceStatus>>>());
+        });
         services.AddScoped<IBatteryService, BatteryService>();
         services.AddScoped<IProfileWriteService, ProfileWriteService>();
         services.AddScoped<IActiveProfileResolver, ActiveProfileResolver>();
@@ -435,16 +473,26 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ITempBasalResolver, TempBasalResolver>();
         services.AddScoped<IProfileProjectionService, ProfileProjectionService>();
         services.AddScoped<IDataEventSink<Profile>>(sp =>
-            new CompositeDataEventSink<Profile>(
-                [sp.GetRequiredService<NightscoutProfileWriteBackSink>()],
-                sp.GetService<ILogger<CompositeDataEventSink<Profile>>>()));
+        {
+            var sinks = new List<IDataEventSink<Profile>>();
+            var writeBack = sp.GetService<NightscoutProfileWriteBackSink>();
+            if (writeBack is not null) sinks.Add(writeBack);
+            return new CompositeDataEventSink<Profile>(
+                sinks,
+                sp.GetService<ILogger<CompositeDataEventSink<Profile>>>());
+        });
 
         // Food services
         services.AddScoped<IFoodService, FoodService>();
         services.AddScoped<IDataEventSink<Food>>(sp =>
-            new CompositeDataEventSink<Food>(
-                [sp.GetRequiredService<NightscoutFoodWriteBackSink>()],
-                sp.GetService<ILogger<CompositeDataEventSink<Food>>>()));
+        {
+            var sinks = new List<IDataEventSink<Food>>();
+            var writeBack = sp.GetService<NightscoutFoodWriteBackSink>();
+            if (writeBack is not null) sinks.Add(writeBack);
+            return new CompositeDataEventSink<Food>(
+                sinks,
+                sp.GetService<ILogger<CompositeDataEventSink<Food>>>());
+        });
         services.AddScoped<IConnectorFoodEntryService, ConnectorFoodEntryService>();
         services.AddScoped<ITreatmentFoodService, TreatmentFoodService>();
         services.AddScoped<IUserFoodFavoriteService, UserFoodFavoriteService>();
@@ -454,9 +502,14 @@ public static class ServiceRegistrationExtensions
         // Activity and health metric services
         services.AddScoped<IActivityService, ActivityService>();
         services.AddScoped<IDataEventSink<Activity>>(sp =>
-            new CompositeDataEventSink<Activity>(
-                [sp.GetRequiredService<NightscoutActivityWriteBackSink>()],
-                sp.GetService<ILogger<CompositeDataEventSink<Activity>>>()));
+        {
+            var sinks = new List<IDataEventSink<Activity>>();
+            var writeBack = sp.GetService<NightscoutActivityWriteBackSink>();
+            if (writeBack is not null) sinks.Add(writeBack);
+            return new CompositeDataEventSink<Activity>(
+                sinks,
+                sp.GetService<ILogger<CompositeDataEventSink<Activity>>>());
+        });
         services.AddScoped<IHeartRateService, HeartRateService>();
         services.AddScoped<IBodyWeightService, BodyWeightService>();
         services.AddScoped<IStepCountService, StepCountService>();
@@ -481,6 +534,9 @@ public static class ServiceRegistrationExtensions
         >();
         services.AddScoped<IClockFaceService, ClockFaceService>();
         services.AddScoped<IWidgetSummaryService, WidgetSummaryService>();
+        // Basal series builder (used by chart data pipeline and reports endpoint)
+        services.AddScoped<IBasalSeriesBuilder, BasalSeriesBuilder>();
+
         // Chart data pipeline stages (order matters!)
         services.AddScoped<ProfileLoadStage>();
         services.AddScoped<DataFetchStage>();
@@ -514,6 +570,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMeterGlucoseRepository, MeterGlucoseRepository>();
         services.AddScoped<ICalibrationRepository, CalibrationRepository>();
         services.AddScoped<IBolusRepository, BolusRepository>();
+        services.AddScoped<IBasalInjectionRepository, BasalInjectionRepository>();
         services.AddScoped<ITempBasalRepository, TempBasalRepository>();
         services.AddScoped<ICarbIntakeRepository, CarbIntakeRepository>();
         services.AddScoped<IBGCheckRepository, BGCheckRepository>();
@@ -684,6 +741,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Nocturne.API.Services.Alerts.Providers.InAppProvider>();
         services.AddScoped<Nocturne.API.Services.Alerts.Providers.WebhookProvider>();
         services.AddScoped<Nocturne.API.Services.Alerts.Providers.ChatBotProvider>();
+        services.AddScoped<Nocturne.API.Services.Alerts.Providers.HomeAssistantProvider>();
         services.AddHttpClient("ChatBot");
 
         // Chat identity
@@ -696,6 +754,9 @@ public static class ServiceRegistrationExtensions
 
         // Background sweep
         services.AddHostedService<AlertSweepService>();
+
+        // Periodic watermark-driven deduplication reconciliation across active tenants
+        services.AddHostedService<Nocturne.API.Services.BackgroundServices.DeduplicationReconciliationBackgroundService>();
 
         return services;
     }
@@ -713,7 +774,12 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IDeduplicationService, DeduplicationService>();
         services.AddSingleton<ISecretEncryptionService, SecretEncryptionService>();
         services.AddScoped<IConnectorConfigurationService, ConnectorConfigurationService>();
+        services.AddScoped<PlatformSettingsService>();
         services.AddScoped<IConnectorSyncService, ConnectorSyncService>();
+        services.AddScoped<IConnectorCursorResetService, ConnectorCursorResetService>();
+        // Singleton: holds the in-memory job registry so a reset started by one request can be
+        // polled by later requests. Creates its own DI scopes for the scoped reset engine.
+        services.AddSingleton<IConnectorCursorResetJobService, ConnectorCursorResetJobService>();
 
         // Connector runtime
         services.AddBaseConnectorServices();

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { TitleFaviconService, type GlucoseStatus } from "./title-favicon-service.svelte";
+import { TitleFaviconService } from "./title-favicon-service.svelte";
 import type { ClientThresholds, TitleFaviconSettings } from "$lib/stores/serverSettings";
 
 // Mock $app/environment

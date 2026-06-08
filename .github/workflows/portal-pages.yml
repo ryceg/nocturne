@@ -1,0 +1,78 @@
+name: Deploy Portal to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/Web/packages/portal/**'
+      - 'src/Web/packages/ui/**'
+      - 'src/Web/packages/cms/**'
+      - 'src/Web/pnpm-lock.yaml'
+      - '.github/workflows/portal-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "10"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: src/Web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: src/Web
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync SvelteKit packages
+        working-directory: src/Web
+        run: |
+          pnpm --filter @nocturne/app exec svelte-kit sync
+          pnpm --filter @nocturne/portal exec svelte-kit sync
+
+      - name: Build portal
+        working-directory: src/Web/packages/portal
+        env:
+          VITE_DEMO_ENABLED: 'true'
+          VITE_DEMO_WEB_URL: 'https://demo.nocturne.run'
+          VITE_SCALAR_API_URL: 'https://nocturne.run'
+        run: pnpm run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: src/Web/packages/portal/build
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

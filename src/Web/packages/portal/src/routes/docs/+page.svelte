@@ -7,11 +7,7 @@
         Download,
         Settings,
         Code2,
-        ExternalLink,
     } from "@lucide/svelte";
-    import { DEMO_ENABLED, getDemoScalarUrl } from "$lib/config";
-
-    const scalarUrl = getDemoScalarUrl();
 </script>
 
 <div class="max-w-3xl">
@@ -98,66 +94,32 @@
             </div>
         </a>
 
-        {#if DEMO_ENABLED}
-            <a
-                href={scalarUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="p-6 rounded-xl border border-border/60 bg-card/50 hover:bg-card hover:border-primary/30 transition-colors group"
-            >
-                <div class="flex items-start gap-4">
-                    <div
-                        class="w-12 h-12 rounded-lg bg-orange-500/15 flex items-center justify-center shrink-0"
-                    >
-                        <Code2 class="w-6 h-6 text-orange-500" />
-                    </div>
-                    <div class="flex-1">
-                        <h2
-                            class="text-lg font-semibold mb-1 group-hover:text-primary transition-colors flex items-center gap-2"
-                        >
-                            API Reference
-                            <ExternalLink class="w-4 h-4" />
-                        </h2>
-                        <p class="text-sm text-muted-foreground">
-                            Interactive API documentation powered by Scalar. Explore
-                            endpoints, test requests, and integrate with Nocturne.
-                        </p>
-                    </div>
-                    <ArrowRight
-                        class="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors"
-                    />
+        <a
+            href="/scalar"
+            class="p-6 rounded-xl border border-border/60 bg-card/50 hover:bg-card hover:border-primary/30 transition-colors group"
+        >
+            <div class="flex items-start gap-4">
+                <div
+                    class="w-12 h-12 rounded-lg bg-orange-500/15 flex items-center justify-center shrink-0"
+                >
+                    <Code2 class="w-6 h-6 text-orange-500" />
                 </div>
-            </a>
-        {:else}
-            <div
-                class="p-6 rounded-xl border border-border/60 bg-card/50 transition-colors"
-            >
-                <div class="flex items-start gap-4">
-                    <div
-                        class="w-12 h-12 rounded-lg bg-orange-500/15 flex items-center justify-center shrink-0"
+                <div class="flex-1">
+                    <h2
+                        class="text-lg font-semibold mb-1 group-hover:text-primary transition-colors"
                     >
-                        <Code2 class="w-6 h-6 text-orange-500" />
-                    </div>
-                    <div class="flex-1">
-                        <h2
-                            class="text-lg font-semibold mb-1 flex items-center gap-2"
-                        >
-                            API Reference
-                        </h2>
-                        <p class="text-sm text-muted-foreground mb-3">
-                            Interactive API documentation powered by Scalar. Explore
-                            endpoints, test requests, and integrate with Nocturne.
-                        </p>
-                        <p
-                            class="text-xs text-muted-foreground font-mono bg-muted/50 px-2 py-1 rounded inline-block"
-                        >
-                            Available at <span class="text-primary">/scalar</span> on
-                            your Nocturne API
-                        </p>
-                    </div>
+                        API Reference
+                    </h2>
+                    <p class="text-sm text-muted-foreground">
+                        Interactive API documentation powered by Scalar. Explore
+                        endpoints, test requests, and integrate with Nocturne.
+                    </p>
                 </div>
+                <ArrowRight
+                    class="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors"
+                />
             </div>
-        {/if}
+        </a>
     </div>
 
     <div class="mt-12 p-6 rounded-xl border border-amber-500/30 bg-amber-500/5">

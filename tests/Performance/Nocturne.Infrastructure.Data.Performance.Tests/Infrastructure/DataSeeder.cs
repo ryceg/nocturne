@@ -128,4 +128,63 @@ public static class DataSeeder
             context.ChangeTracker.Clear();
         }
     }
+
+    public static async Task SeedTempBasalsAsync(
+        NocturneDbContext context, Guid tenantId, int count, CancellationToken ct = default)
+    {
+        var baseTime = new DateTime(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        const int batchSize = 1000;
+
+        for (int batch = 0; batch < count; batch += batchSize)
+        {
+            var chunk = Math.Min(batchSize, count - batch);
+            for (int i = 0; i < chunk; i++)
+            {
+                var idx = batch + i;
+                var start = baseTime.AddMinutes(idx * 5);
+                context.TempBasals.Add(new TempBasalEntity
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    StartTimestamp = start,
+                    EndTimestamp = start.AddMinutes(5),
+                    Rate = Math.Round(0.5 + Rng.NextDouble() * 2.0, 2),
+                    Origin = "Unknown",
+                    SysCreatedAt = DateTime.UtcNow,
+                    SysUpdatedAt = DateTime.UtcNow,
+                });
+            }
+
+            await context.SaveChangesAsync(ct);
+            context.ChangeTracker.Clear();
+        }
+    }
+
+    public static async Task SeedCarbIntakesAsync(
+        NocturneDbContext context, Guid tenantId, int count, CancellationToken ct = default)
+    {
+        var baseTime = new DateTime(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        const int batchSize = 1000;
+
+        for (int batch = 0; batch < count; batch += batchSize)
+        {
+            var chunk = Math.Min(batchSize, count - batch);
+            for (int i = 0; i < chunk; i++)
+            {
+                var idx = batch + i;
+                context.CarbIntakes.Add(new CarbIntakeEntity
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Timestamp = baseTime.AddMinutes(idx * 30),
+                    Carbs = Math.Round(10 + Rng.NextDouble() * 90, 1),
+                    SysCreatedAt = DateTime.UtcNow,
+                    SysUpdatedAt = DateTime.UtcNow,
+                });
+            }
+
+            await context.SaveChangesAsync(ct);
+            context.ChangeTracker.Clear();
+        }
+    }
 }

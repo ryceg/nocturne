@@ -239,6 +239,7 @@ public class OAuthTokenServiceTests : IDisposable
         var entity = new OAuthRefreshTokenEntity
         {
             Id = Guid.CreateVersion7(),
+            TenantId = _testTenantId,
             GrantId = grantId ?? _testGrantId,
             TokenHash = tokenHash,
             IssuedAt = DateTime.UtcNow,

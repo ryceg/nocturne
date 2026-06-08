@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Mappers.V4;
+using Nocturne.Infrastructure.Data.Services;
 
 namespace Nocturne.Infrastructure.Data.Repositories.V4;
 
@@ -10,15 +11,15 @@ namespace Nocturne.Infrastructure.Data.Repositories.V4;
 /// </summary>
 public class DeviceRepository : IDeviceRepository
 {
-    private readonly NocturneDbContext _context;
+    private readonly ITenantDbContextFactory _contextFactory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeviceRepository"/> class.
     /// </summary>
-    /// <param name="context">The database context.</param>
-    public DeviceRepository(NocturneDbContext context)
+    /// <param name="contextFactory">The tenant database context factory.</param>
+    public DeviceRepository(ITenantDbContextFactory contextFactory)
     {
-        _context = context;
+        _contextFactory = contextFactory;
     }
 
     /// <summary>
@@ -29,7 +30,8 @@ public class DeviceRepository : IDeviceRepository
     /// <returns>The device, or null if not found.</returns>
     public async Task<Device?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var entity = await _context.Devices.FindAsync([id], ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.Devices.FindAsync([id], ct);
         return entity is null ? null : DeviceMapper.ToDomainModel(entity);
     }
 
@@ -43,8 +45,9 @@ public class DeviceRepository : IDeviceRepository
     /// <returns>The matching device, or null if not found.</returns>
     public async Task<Device?> FindByCategoryTypeAndSerialAsync(DeviceCategory category, string type, string serial, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var categoryStr = category.ToString();
-        var entity = await _context.Devices
+        var entity = await ctx.Devices
             .FirstOrDefaultAsync(e => e.Category == categoryStr && e.Type == type && e.Serial == serial, ct);
         return entity is null ? null : DeviceMapper.ToDomainModel(entity);
     }
@@ -57,9 +60,10 @@ public class DeviceRepository : IDeviceRepository
     /// <returns>The created device.</returns>
     public async Task<Device> CreateAsync(Device model, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity = DeviceMapper.ToEntity(model);
-        _context.Devices.Add(entity);
-        await _context.SaveChangesAsync(ct);
+        ctx.Devices.Add(entity);
+        await ctx.SaveChangesAsync(ct);
         return DeviceMapper.ToDomainModel(entity);
     }
 
@@ -72,11 +76,12 @@ public class DeviceRepository : IDeviceRepository
     /// <returns>The updated device.</returns>
     public async Task<Device> UpdateAsync(Guid id, Device model, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity =
-            await _context.Devices.FindAsync([id], ct)
+            await ctx.Devices.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"Device {id} not found");
         DeviceMapper.UpdateEntity(entity, model);
-        await _context.SaveChangesAsync(ct);
+        await ctx.SaveChangesAsync(ct);
         return DeviceMapper.ToDomainModel(entity);
     }
 }

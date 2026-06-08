@@ -220,6 +220,7 @@ public class OAuthTokenService : IOAuthTokenService
 
         var newTokenEntity = new Infrastructure.Data.Entities.OAuthRefreshTokenEntity
         {
+            TenantId = oauthToken.Grant.TenantId,
             GrantId = oauthToken.GrantId,
             TokenHash = newTokenHash,
             IssuedAt = DateTime.UtcNow,
@@ -445,6 +446,7 @@ public class OAuthTokenService : IOAuthTokenService
 
         var refreshTokenEntity = new Infrastructure.Data.Entities.OAuthRefreshTokenEntity
         {
+            TenantId = grant.TenantId,
             GrantId = grant.Id,
             TokenHash = tokenHash,
             IssuedAt = DateTime.UtcNow,

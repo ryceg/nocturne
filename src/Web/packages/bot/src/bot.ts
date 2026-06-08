@@ -3,17 +3,35 @@ import { createDiscordAdapter } from "@chat-adapter/discord";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
 import { createWhatsAppAdapter } from "@chat-adapter/whatsapp";
+import { createResendAdapter } from "@resend/chat-sdk-adapter";
 import { createPostgresState } from "@chat-adapter/state-pg";
 import { createLogger } from "./lib/logger.js";
 
 const logger = createLogger();
 
+export interface PlatformCredentials {
+  enabled: boolean;
+  botToken?: string;
+  publicKey?: string;
+  applicationId?: string;
+  signingSecret?: string;
+  accessToken?: string;
+  appSecret?: string;
+  phoneNumberId?: string;
+  verifyToken?: string;
+  fromAddress?: string;
+  fromName?: string;
+  apiKey?: string;
+  webhookSecret?: string;
+}
+
 export interface BotOptions {
   platforms?: {
-    discord?: boolean;
-    slack?: boolean;
-    telegram?: boolean;
-    whatsapp?: boolean;
+    discord?: PlatformCredentials | boolean;
+    slack?: PlatformCredentials | boolean;
+    telegram?: PlatformCredentials | boolean;
+    whatsapp?: PlatformCredentials | boolean;
+    resend?: PlatformCredentials | boolean;
   };
   postgresUrl: string;
 }
@@ -22,21 +40,85 @@ export function createBot(options: BotOptions): Chat {
   const adapters: Record<string, any> = {};
   const platforms = options.platforms ?? {};
 
-  if (platforms.discord) {
+  const discord = platforms.discord;
+  if (discord) {
     logger.info("Enabling Discord adapter");
-    adapters.discord = createDiscordAdapter();
+    if (typeof discord === "object") {
+      adapters.discord = createDiscordAdapter({
+        botToken: discord.botToken!,
+        publicKey: discord.publicKey!,
+        applicationId: discord.applicationId!,
+      });
+    } else {
+      adapters.discord = createDiscordAdapter(); // env var fallback
+    }
   }
-  if (platforms.slack) {
+
+  const slack = platforms.slack;
+  if (slack) {
     logger.info("Enabling Slack adapter");
-    adapters.slack = createSlackAdapter();
+    if (typeof slack === "object") {
+      adapters.slack = createSlackAdapter({
+        botToken: slack.botToken!,
+        signingSecret: slack.signingSecret!,
+      });
+    } else {
+      adapters.slack = createSlackAdapter(); // env var fallback
+    }
   }
-  if (platforms.telegram) {
+
+  const telegram = platforms.telegram;
+  if (telegram) {
     logger.info("Enabling Telegram adapter");
-    adapters.telegram = createTelegramAdapter();
+    if (typeof telegram === "object") {
+      adapters.telegram = createTelegramAdapter({
+        botToken: telegram.botToken!,
+      });
+    } else {
+      adapters.telegram = createTelegramAdapter(); // env var fallback
+    }
   }
-  if (platforms.whatsapp) {
+
+  const whatsapp = platforms.whatsapp;
+  if (whatsapp) {
     logger.info("Enabling WhatsApp adapter");
-    adapters.whatsapp = createWhatsAppAdapter();
+    if (typeof whatsapp === "object") {
+      adapters.whatsapp = createWhatsAppAdapter({
+        accessToken: whatsapp.accessToken!,
+        appSecret: whatsapp.appSecret!,
+        phoneNumberId: whatsapp.phoneNumberId!,
+        verifyToken: whatsapp.verifyToken!,
+        userName: "nocturne",
+        logger,
+      });
+    } else {
+      adapters.whatsapp = createWhatsAppAdapter({
+        accessToken: process.env.WHATSAPP_ACCESS_TOKEN!,
+        appSecret: process.env.WHATSAPP_APP_SECRET!,
+        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID!,
+        verifyToken: process.env.WHATSAPP_VERIFY_TOKEN!,
+        userName: "nocturne",
+        logger,
+      });
+    }
+  }
+
+  const resend = platforms.resend;
+  if (resend) {
+    if (typeof resend === "object") {
+      logger.info("Enabling Resend adapter");
+      adapters.resend = createResendAdapter({
+        fromAddress: resend.fromAddress!,
+        fromName: resend.fromName,
+        apiKey: resend.apiKey!,
+        webhookSecret: resend.webhookSecret,
+      });
+    } else {
+      adapters.resend = createResendAdapter({
+        fromAddress: process.env.RESEND_FROM_ADDRESS!,
+        fromName: process.env.RESEND_FROM_NAME,
+      }); // apiKey + webhookSecret auto-load from env
+    }
   }
 
   if (Object.keys(adapters).length === 0) {

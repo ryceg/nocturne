@@ -582,6 +582,48 @@ public class SensorContextEnricherTests
         enriched.ActiveTempBasal.ScheduledRate.Should().BeNull();
     }
 
+    [Fact]
+    public async Task GlucoseBucket_resolution_picks_schedule_entry_in_tenant_local_time_not_utc()
+    {
+        // Sydney is UTC+11 in March (AEDT). At 19:00 UTC on 2026-03-21 the local wall clock
+        // is 06:00 on 2026-03-22 in Sydney. The schedule below has two entries: a low/tight
+        // band before noon (low=80) and a relaxed band from noon onward (low=70). A reading
+        // of 75 mg/dL must resolve to the 06:00-Sydney-local entry (low=80 → Low bucket),
+        // not the noon-local entry. Before the fix the resolver pulled the time-of-day from
+        // the UTC clock — 19:00 UTC sits past 12:00 so the wrong entry was picked.
+        var enricher = BuildEnricher();
+        var tickUtc = new DateTime(2026, 3, 21, 19, 0, 0, DateTimeKind.Utc);
+        var sydneyTz = TryResolve("Australia/Sydney", "AUS Eastern Standard Time");
+
+        _therapySettingsResolver.Setup(s => s.GetTimezoneAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(sydneyTz);
+        _activeProfileResolver.Setup(s => s.GetActiveProfileNameAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Default");
+        _targetRangeScheduleRepository.Setup(s => s.GetActiveAtAsync("Default", It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TargetRangeSchedule
+            {
+                ProfileName = "Default",
+                Entries =
+                [
+                    new TargetRangeEntry { Time = "00:00", TimeAsSeconds = 0,     Low = 80, High = 180 },
+                    new TargetRangeEntry { Time = "12:00", TimeAsSeconds = 43200, Low = 70, High = 180 },
+                ],
+            });
+
+        var rule = MakeRule(AlertConditionType.GlucoseBucket, """{"buckets":["low"]}""");
+        var baseContext = BaseContext() with { LatestValue = 75m };
+
+        var enriched = await enricher.EnrichAsOfAsync(baseContext, new[] { rule }, _tenantId, tickUtc, CancellationToken.None);
+
+        enriched.GlucoseBucket.Should().Be(Nocturne.Core.Models.Alerts.GlucoseBucket.Low);
+    }
+
+    private static string TryResolve(string ianaId, string windowsId)
+    {
+        try { TimeZoneInfo.FindSystemTimeZoneById(ianaId); return ianaId; }
+        catch { return windowsId; }
+    }
+
     private SensorContextEnricher BuildEnricher(
         bool includePredictionService = true,
         AlertEvaluationOptions? options = null)

@@ -4,6 +4,7 @@ export type {
   CoachMarkOptions,
   CoachMarkProviderOptions,
   CoachMarkStep,
+  DismissOptions,
   MarkRegistration,
   MarkState,
   MarkStatus,

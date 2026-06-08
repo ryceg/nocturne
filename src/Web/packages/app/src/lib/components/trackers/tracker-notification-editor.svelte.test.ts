@@ -2,6 +2,7 @@ import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
 import { describe, it, expect } from "vitest";
 import TrackerNotificationEditor from "./tracker-notification-editor-test-wrapper.svelte";
+import { NotificationUrgency } from "$api";
 
 describe("TrackerNotificationEditor", () => {
 	it("renders the section label and add button", async () => {
@@ -29,7 +30,7 @@ describe("TrackerNotificationEditor", () => {
 	it("renders notification entries", async () => {
 		render(TrackerNotificationEditor, {
 			notifications: [
-				{ urgency: "Info", hours: 24, description: "Check soon" },
+				{ urgency: NotificationUrgency.Info, hours: 24, description: "Check soon" },
 			],
 		});
 
@@ -42,7 +43,7 @@ describe("TrackerNotificationEditor", () => {
 	it("shows 'Hours' label in Event mode instead of 'After (hours)'", async () => {
 		render(TrackerNotificationEditor, {
 			notifications: [
-				{ urgency: "Info", hours: 24, description: "" },
+				{ urgency: NotificationUrgency.Info, hours: 24, description: "" },
 			],
 			mode: "Event",
 		});
@@ -53,7 +54,7 @@ describe("TrackerNotificationEditor", () => {
 	it("shows Duration mode help text", async () => {
 		render(TrackerNotificationEditor, {
 			notifications: [
-				{ urgency: "Info", hours: 24, description: "" },
+				{ urgency: NotificationUrgency.Info, hours: 24, description: "" },
 			],
 			mode: "Duration",
 		});
@@ -66,7 +67,7 @@ describe("TrackerNotificationEditor", () => {
 	it("shows Event mode help text", async () => {
 		render(TrackerNotificationEditor, {
 			notifications: [
-				{ urgency: "Info", hours: 24, description: "" },
+				{ urgency: NotificationUrgency.Info, hours: 24, description: "" },
 			],
 			mode: "Event",
 		});
@@ -79,10 +80,10 @@ describe("TrackerNotificationEditor", () => {
 	it("disables add button when 4 notifications exist", async () => {
 		render(TrackerNotificationEditor, {
 			notifications: [
-				{ urgency: "Info", hours: 24, description: "" },
-				{ urgency: "Warn", hours: 48, description: "" },
-				{ urgency: "Hazard", hours: 72, description: "" },
-				{ urgency: "Urgent", hours: 96, description: "" },
+				{ urgency: NotificationUrgency.Info, hours: 24, description: "" },
+				{ urgency: NotificationUrgency.Warn, hours: 48, description: "" },
+				{ urgency: NotificationUrgency.Hazard, hours: 72, description: "" },
+				{ urgency: NotificationUrgency.Urgent, hours: 96, description: "" },
 			],
 		});
 
@@ -94,8 +95,8 @@ describe("TrackerNotificationEditor", () => {
 	it("renders remove buttons for each notification", async () => {
 		render(TrackerNotificationEditor, {
 			notifications: [
-				{ urgency: "Info", hours: 24, description: "First" },
-				{ urgency: "Warn", hours: 48, description: "Second" },
+				{ urgency: NotificationUrgency.Info, hours: 24, description: "First" },
+				{ urgency: NotificationUrgency.Warn, hours: 48, description: "Second" },
 			],
 		});
 

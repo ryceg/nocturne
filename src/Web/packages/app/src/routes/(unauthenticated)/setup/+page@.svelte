@@ -2,7 +2,13 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { ArrowRight, ArrowLeft, Sprout, Cable, ShieldAlert } from "lucide-svelte";
+  import {
+    ArrowRight,
+    ArrowLeft,
+    Sprout,
+    Cable,
+    ShieldAlert,
+  } from "lucide-svelte";
   import { Button } from "$lib/components/ui/button";
   import { markSetupComplete } from "./setup.remote";
   import AppLogo from "$lib/components/ui/AppLogo.svelte";
@@ -37,7 +43,9 @@
 
   // ── HTTPS guard ─────────────────────────────────────────────────────
   const httpsRequired = $derived(
-    browser && window.location.protocol !== "https:" && !window.location.hostname.match(/^(localhost|127\.0\.0\.1|::1|\[::1\])$/)
+    browser &&
+      window.location.protocol !== "https:" &&
+      !window.location.hostname.match(/^(localhost|127\.0\.0\.1|::1|\[::1\])$/)
   );
 
   // ── Setup phase (pre-auth) ──────────────────────────────────────────
@@ -229,21 +237,32 @@
     if (finishIdx >= 0) stepIndex = finishIdx;
   }
 
+  // The Nightscout history import is started from the saved connector. It lives here (a
+  // deliberate action after the user connects their source) rather than auto-firing inside the
+  // progress view, so it runs in the onboarding tenant's own request context.
+  const MIGRATION_CONNECTOR = "nightscout";
+
   async function handleMigrationConnected() {
-    // Check for an active migration job started by the connector
+    // Start the import explicitly now that the user has connected their source. Reuse an
+    // already-running or already-completed job if one exists (e.g. the user navigated back),
+    // so re-entering this step never kicks off a duplicate migration.
     try {
       const history = await migrationRemote.getHistory();
-      const activeJob = history?.find(
+      const existing = history?.find(
         (j) =>
           j.state === MigrationJobState.Running ||
           j.state === MigrationJobState.Pending ||
-          j.state === MigrationJobState.Validating
+          j.state === MigrationJobState.Validating ||
+          j.state === MigrationJobState.Completed
       );
-      if (activeJob?.id) {
-        migrationJobId = activeJob.id;
+      if (existing?.id) {
+        migrationJobId = existing.id;
+      } else {
+        const job = await migrationRemote.startFromConnector(MIGRATION_CONNECTOR);
+        if (job?.id) migrationJobId = job.id;
       }
     } catch {
-      // ImportProgress will find the job itself if we can't here
+      // Leave migrationJobId unset; the import step shows a neutral state if no job exists.
     }
     handleNext();
   }
@@ -360,8 +379,12 @@
           <ShieldAlert class="mx-auto mb-4 h-12 w-12 text-red-400" />
           <h2 class="text-xl font-semibold text-white mb-3">HTTPS Required</h2>
           <p class="text-white/60 text-sm leading-relaxed">
-            Nocturne requires a secure connection. Please access this site
-            using <strong class="text-white">https://</strong> instead of http://.
+            Nocturne requires a secure connection. Please access this site using <strong
+              class="text-white"
+            >
+              https://
+            </strong>
+             instead of http://.
           </p>
           <p class="text-white/40 text-xs mt-4">
             Passkey authentication and secure cookies require HTTPS to function.
@@ -667,7 +690,7 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-        <AppLogo icon="github" />
+        <AppLogo class="max-h-12" icon="github" />
         Source
       </a>
     </div>

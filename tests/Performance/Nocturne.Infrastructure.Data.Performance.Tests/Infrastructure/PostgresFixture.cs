@@ -108,9 +108,12 @@ public class PostgresFixture : IAsyncDisposable
             tenant_id uuid NOT NULL,
             timestamp timestamptz NOT NULL,
             insulin double precision NOT NULL,
+            programmed double precision,
+            delivered double precision,
             bolus_type text,
             bolus_kind text,
             automatic boolean NOT NULL DEFAULT false,
+            duration double precision,
             device text,
             app text,
             data_source text,
@@ -118,6 +121,14 @@ public class PostgresFixture : IAsyncDisposable
             utc_offset integer,
             correlation_id uuid,
             legacy_id text,
+            insulin_type text,
+            insulin_context jsonb,
+            unabsorbed double precision,
+            device_id uuid,
+            patient_device_id uuid,
+            pump_record_id text,
+            bolus_calculation_id uuid,
+            aps_snapshot_id uuid,
             additional_properties jsonb,
             sys_created_at timestamptz NOT NULL DEFAULT now(),
             sys_updated_at timestamptz NOT NULL DEFAULT now()
@@ -145,5 +156,54 @@ public class PostgresFixture : IAsyncDisposable
         CREATE INDEX ix_linked_records_type_canonical_primary ON linked_records (record_type, canonical_id, is_primary);
         CREATE INDEX ix_linked_records_type_timestamp ON linked_records (record_type, source_timestamp);
         CREATE INDEX ix_linked_records_non_primary_record ON linked_records (record_type, record_id) WHERE NOT is_primary;
+
+        CREATE TABLE IF NOT EXISTS temp_basals (
+            id uuid PRIMARY KEY,
+            tenant_id uuid NOT NULL,
+            start_timestamp timestamptz NOT NULL,
+            end_timestamp timestamptz,
+            rate double precision NOT NULL,
+            scheduled_rate double precision,
+            origin varchar(32) NOT NULL DEFAULT 'Unknown',
+            utc_offset integer,
+            device varchar(256),
+            app varchar(256),
+            data_source varchar(256),
+            correlation_id uuid,
+            legacy_id varchar(64),
+            device_id uuid,
+            patient_device_id uuid,
+            pump_record_id varchar(256),
+            aps_snapshot_id uuid,
+            insulin_context jsonb,
+            additional_properties jsonb,
+            sys_created_at timestamptz NOT NULL DEFAULT now(),
+            sys_updated_at timestamptz NOT NULL DEFAULT now()
+        );
+
+        CREATE INDEX ix_temp_basals_start_timestamp ON temp_basals (start_timestamp DESC);
+        CREATE INDEX ix_temp_basals_tenant_start ON temp_basals (tenant_id, start_timestamp DESC);
+
+        CREATE TABLE IF NOT EXISTS carb_intakes (
+            id uuid PRIMARY KEY,
+            tenant_id uuid NOT NULL,
+            timestamp timestamptz NOT NULL,
+            carbs double precision NOT NULL,
+            utc_offset integer,
+            device varchar(256),
+            app varchar(256),
+            data_source varchar(256),
+            sync_identifier varchar(256),
+            legacy_id varchar(64),
+            correlation_id uuid,
+            carb_time double precision,
+            absorption_time integer,
+            additional_properties jsonb,
+            sys_created_at timestamptz NOT NULL DEFAULT now(),
+            sys_updated_at timestamptz NOT NULL DEFAULT now()
+        );
+
+        CREATE INDEX ix_carb_intakes_timestamp ON carb_intakes (timestamp DESC);
+        CREATE INDEX ix_carb_intakes_tenant_timestamp ON carb_intakes (tenant_id, timestamp DESC);
         """;
 }

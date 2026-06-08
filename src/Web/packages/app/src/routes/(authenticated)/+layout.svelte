@@ -12,11 +12,14 @@
   import type { AlarmVisualSettings } from "$lib/types/alarm-profile";
   import type { TitleFaviconSettings } from "$lib/stores/serverSettings";
   import { browser } from "$app/environment";
+  import { beforeNavigate } from "$app/navigation";
   import * as Card from "$lib/components/ui/card";
   import { Button } from "$lib/components/ui/button";
   import AlertBanner from "$lib/components/alerts/AlertBanner.svelte";
   import FiringToast from "$lib/components/alerts/FiringToast.svelte";
+  import DemoBanner from "$lib/components/layout/DemoBanner.svelte";
   import GuestBanner from "$lib/components/layout/GuestBanner.svelte";
+  import MembershipRequestAutoSubmit from "$lib/components/members/MembershipRequestAutoSubmit.svelte";
   import { CommandPalette } from "$lib/components/command-palette";
   import { CoachMarkProvider } from "@nocturne/coach";
   import "@nocturne/coach/theme.css";
@@ -32,7 +35,7 @@
   // WebSocket config - defaults, can be overridden in production
   const config = {
     url: typeof window !== "undefined" ? window.location.origin : "",
-    reconnectAttempts: 10,
+    reconnectAttempts: Infinity,
     reconnectDelay: 5000,
     maxReconnectDelay: 30000,
     pingTimeout: 60000,
@@ -55,6 +58,13 @@
   createSettingsStore();
 
   let commandPaletteOpen = $state(false);
+
+  let tenantSlug = $state<string | undefined>(undefined);
+  $effect(() => {
+    if (!browser) return;
+    const parts = window.location.hostname.split(".");
+    if (parts.length > 2) tenantSlug = parts[0];
+  });
 
   const coachMarkAdapter = createCoachMarkAdapter();
 
@@ -95,9 +105,10 @@
     }
   }
 
-  // Initialize realtime and title/favicon services
+  // Initialize realtime and title/favicon services for users authorized to
+  // view glucose data (authenticated with read permissions, or public site visitors).
   $effect(() => {
-    if (data.isAuthenticated) {
+    if (data.canViewRealtimeData) {
       realtimeStore.initialize();
       titleFaviconService.initialize();
     }
@@ -176,7 +187,7 @@
           const alarmVisual: AlarmVisualSettings = {
             screenFlash: true,
             flashColor: "",
-            flashIntervalMs: 500,
+            flashIntervalMs: 1000,
             persistentBanner: true,
             wakeScreen: true,
             showEmergencyContacts: false,
@@ -193,15 +204,23 @@
   });
 </script>
 
-<CoachMarkProvider adapter={coachMarkAdapter} {sequences}>
+<CoachMarkProvider adapter={coachMarkAdapter} {sequences} onBeforeNavigate={beforeNavigate}>
   <CoachParamHandler />
   <Sidebar.Provider>
-    <AppSidebar user={data.user} tenantCount={data.tenantCount} effectivePermissions={data.effectivePermissions} isPlatformAdmin={data.isPlatformAdmin} isGuestSession={data.isGuestSession} />
-    <MobileHeader />
+    <AppSidebar user={data.user} effectivePermissions={data.effectivePermissions} isPlatformAdmin={data.isPlatformAdmin} isPlatformAccessGrant={data.isPlatformAccessGrant} isGuestSession={data.isGuestSession} />
     <Sidebar.Inset>
+      <MobileHeader />
+      {#if data.isDemo}
+        <DemoBanner nextResetAt={data.nextResetAt} />
+      {/if}
       {#if data.isGuestSession && data.guestExpiresAt}
         <GuestBanner expiresAt={data.guestExpiresAt} />
       {/if}
+      <MembershipRequestAutoSubmit
+        isAuthenticated={!!data.user}
+        isGuestSession={data.isGuestSession}
+        {tenantSlug}
+      />
       <AlertBanner />
       <FiringToast />
       <main class="flex-1 overflow-auto">

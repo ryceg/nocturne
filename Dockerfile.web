@@ -3,7 +3,7 @@ WORKDIR /app
 # Increase Node.js heap size to avoid "JavaScript heap out of memory" in CI
 ENV NODE_OPTIONS="--max-old-space-size=8192"
 
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@10
 
 # Copy workspace files
 COPY src/Web/package.json src/Web/pnpm-lock.yaml src/Web/pnpm-workspace.yaml ./
@@ -32,7 +32,7 @@ RUN pnpm --filter @nocturne/app run build
 FROM node:24-alpine
 WORKDIR /app
 
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@10
 
 # Copy workspace structure
 COPY --from=builder /app/package.json ./

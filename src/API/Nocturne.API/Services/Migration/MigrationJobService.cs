@@ -6,8 +6,10 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Nocturne.Core.Constants;
 using Nocturne.Core.Models;
+using Nocturne.Core.Contracts.Multitenancy;
 using Nocturne.Core.Contracts.V4;
 using Nocturne.Infrastructure.Data;
+using Nocturne.Infrastructure.Data.Entities;
 
 namespace Nocturne.API.Services.Migration;
 
@@ -19,15 +21,16 @@ public interface IMigrationJobService
 {
     Task<MigrationJobInfo> StartMigrationAsync(
         StartMigrationRequest request,
+        TenantContext? tenantContext,
         CancellationToken ct = default
     );
 
-    /// <exception cref="KeyNotFoundException">Thrown when the migration job is not found.</exception>
-    Task<MigrationJobStatus> GetStatusAsync(Guid jobId);
+    /// <exception cref="KeyNotFoundException">Thrown when the migration job is not found for the given tenant.</exception>
+    Task<MigrationJobStatus> GetStatusAsync(Guid tenantId, Guid jobId);
 
-    /// <exception cref="KeyNotFoundException">Thrown when the migration job is not found.</exception>
-    Task CancelAsync(Guid jobId);
-    Task<IReadOnlyList<MigrationJobInfo>> GetHistoryAsync();
+    /// <exception cref="KeyNotFoundException">Thrown when the migration job is not found for the given tenant.</exception>
+    Task CancelAsync(Guid tenantId, Guid jobId);
+    Task<IReadOnlyList<MigrationJobInfo>> GetHistoryAsync(Guid tenantId);
     Task<TestMigrationConnectionResult> TestConnectionAsync(
         TestMigrationConnectionRequest request,
         CancellationToken ct = default
@@ -49,7 +52,7 @@ public class MigrationJobService : IMigrationJobService
     private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
     private readonly ConcurrentDictionary<Guid, MigrationJob> _jobs = new();
-    private readonly List<MigrationJobInfo> _history = [];
+    private readonly List<(Guid TenantId, MigrationJobInfo Info)> _history = [];
     private readonly object _historyLock = new();
 
     public MigrationJobService(
@@ -65,10 +68,21 @@ public class MigrationJobService : IMigrationJobService
 
     public async Task<MigrationJobInfo> StartMigrationAsync(
         StartMigrationRequest request,
+        TenantContext? tenantContext,
         CancellationToken ct = default
     )
     {
+        // Never start a migration without a resolved tenant. The job writes via the detached
+        // background task, so an empty/unresolved tenant here would otherwise fall back to a
+        // stale pooled DbContext tenant and import a third party's data into the wrong tenant.
+        if (tenantContext is null || tenantContext.TenantId == Guid.Empty)
+        {
+            throw new InvalidOperationException(
+                "A migration requires a resolved tenant context; refusing to start without one.");
+        }
+
         var jobId = Guid.CreateVersion7();
+        var tenantId = tenantContext.TenantId;
         var sourceDesc =
             request.Mode == MigrationMode.Api
                 ? request.NightscoutUrl
@@ -82,28 +96,32 @@ public class MigrationJobService : IMigrationJobService
             SourceDescription = sourceDesc,
         };
 
-        var job = new MigrationJob(jobId, request, jobInfo, _logger, _serviceProvider);
+        var job = new MigrationJob(jobId, tenantId, request, jobInfo, tenantContext, _logger, _serviceProvider);
         _jobs[jobId] = job;
 
         lock (_historyLock)
         {
-            _history.Add(jobInfo);
+            _history.Add((tenantId, jobInfo));
         }
 
-        // Start migration in background
+        // Start migration on a detached background task. This deliberately does NOT use the
+        // request's CancellationToken (HttpContext.RequestAborted): the migration is designed to
+        // outlive the HTTP request that kicked it off, and tying it to the request token would
+        // cancel/abort it as soon as that request completes. User-initiated cancellation flows
+        // through the job's own CancellationTokenSource via Cancel().
         _ = Task.Run(
             async () =>
             {
                 try
                 {
-                    await job.ExecuteAsync(ct);
+                    await job.ExecuteAsync(CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Migration job {JobId} failed", jobId);
                 }
             },
-            ct
+            CancellationToken.None
         );
 
         _logger.LogInformation(
@@ -116,9 +134,9 @@ public class MigrationJobService : IMigrationJobService
         return jobInfo;
     }
 
-    public Task<MigrationJobStatus> GetStatusAsync(Guid jobId)
+    public Task<MigrationJobStatus> GetStatusAsync(Guid tenantId, Guid jobId)
     {
-        if (_jobs.TryGetValue(jobId, out var job))
+        if (_jobs.TryGetValue(jobId, out var job) && job.TenantId == tenantId)
         {
             return Task.FromResult(job.GetStatus());
         }
@@ -126,9 +144,9 @@ public class MigrationJobService : IMigrationJobService
         throw new KeyNotFoundException($"Migration job {jobId} not found");
     }
 
-    public Task CancelAsync(Guid jobId)
+    public Task CancelAsync(Guid tenantId, Guid jobId)
     {
-        if (_jobs.TryGetValue(jobId, out var job))
+        if (_jobs.TryGetValue(jobId, out var job) && job.TenantId == tenantId)
         {
             job.Cancel();
             _logger.LogInformation("Cancelled migration job {JobId}", jobId);
@@ -138,11 +156,12 @@ public class MigrationJobService : IMigrationJobService
         throw new KeyNotFoundException($"Migration job {jobId} not found");
     }
 
-    public Task<IReadOnlyList<MigrationJobInfo>> GetHistoryAsync()
+    public Task<IReadOnlyList<MigrationJobInfo>> GetHistoryAsync(Guid tenantId)
     {
         lock (_historyLock)
         {
-            return Task.FromResult<IReadOnlyList<MigrationJobInfo>>(_history.ToList());
+            return Task.FromResult<IReadOnlyList<MigrationJobInfo>>(
+                _history.Where(h => h.TenantId == tenantId).Select(h => h.Info).ToList());
         }
     }
 
@@ -214,7 +233,7 @@ public class MigrationJobService : IMigrationJobService
             {
                 IsSuccess = true,
                 SiteName = request.NightscoutUrl,
-                AvailableCollections = ["entries", "treatments", "profile", "devicestatus", "food", "activity"],
+                AvailableCollections = ["subjects", "entries", "treatments", "profile", "devicestatus", "food", "activity"],
             };
         }
         catch (HttpRequestException ex)
@@ -346,11 +365,16 @@ public class MigrationJobService : IMigrationJobService
 internal class MigrationJob
 {
     private readonly Guid _id;
+    private readonly Guid _tenantId;
     private readonly StartMigrationRequest _request;
     private readonly MigrationJobInfo _info;
+    private readonly TenantContext? _tenantContext;
     private readonly ILogger _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly CancellationTokenSource _cts = new();
+
+    /// <summary>The tenant that owns this migration job. Used to scope status/cancel lookups.</summary>
+    public Guid TenantId => _tenantId;
     private MigrationJobState _state = MigrationJobState.Pending;
     private string? _currentOperation;
     private string? _errorMessage;
@@ -358,20 +382,47 @@ internal class MigrationJob
     private DateTime _startedAt;
     private DateTime? _completedAt;
     private readonly ConcurrentDictionary<string, CollectionProgress> _collectionProgress = new();
+    private static readonly System.Text.Json.JsonSerializerOptions s_caseInsensitiveJson = new() { PropertyNameCaseInsensitive = true };
 
     public MigrationJob(
         Guid id,
+        Guid tenantId,
         StartMigrationRequest request,
         MigrationJobInfo info,
+        TenantContext? tenantContext,
         ILogger logger,
         IServiceProvider serviceProvider
     )
     {
         _id = id;
+        _tenantId = tenantId;
         _request = request;
         _info = info;
+        _tenantContext = tenantContext;
         _logger = logger;
         _serviceProvider = serviceProvider;
+    }
+
+    /// <summary>
+    /// Creates a DI scope for migration work and propagates the owning tenant's context into it,
+    /// so that tenant-scoped services (NocturneDbContext, decomposers, repositories) resolve and
+    /// write under the correct tenant. The migration runs on a detached background task with no
+    /// ambient request scope, so the tenant must be re-applied explicitly here — mirroring the
+    /// pattern used by other background services (e.g. ConnectorBackgroundService).
+    /// </summary>
+    private IServiceScope CreateTenantScope()
+    {
+        var scope = _serviceProvider.CreateScope();
+        if (_tenantContext is not null)
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantAccessor>().SetTenant(_tenantContext);
+            // Pin the RLS tenant on the pooled DbContext too: setting ITenantAccessor alone does
+            // not retrofit an already-leased context (TenantConnectionInterceptor reads
+            // NocturneDbContext.TenantId on connection open). Without this the detached migration
+            // task could write under a stale pooled tenant. Mirrors ConnectorBackgroundService.
+            scope.ServiceProvider.GetRequiredService<NocturneDbContext>().TenantId = _tenantContext.TenantId;
+        }
+        return scope;
     }
 
     public MigrationJobStatus GetStatus() =>
@@ -443,7 +494,7 @@ internal class MigrationJob
     {
         _currentOperation = "Connecting to Nightscout";
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = CreateTenantScope();
         var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
         var httpClient = httpClientFactory.CreateClient();
         httpClient.BaseAddress = new Uri(_request.NightscoutUrl!.TrimEnd('/'));
@@ -459,6 +510,7 @@ internal class MigrationJob
         // Build the list of collections to migrate
         var allCollections = new (string name, Func<HttpClient, NocturneDbContext, CancellationToken, Task> migrate)[]
         {
+            ("subjects", MigrateSubjectsViaApiAsync),
             ("entries", MigrateEntriesViaApiAsync),
             ("treatments", MigrateTreatmentsViaApiAsync),
             ("devicestatus", MigrateDeviceStatusViaApiAsync),
@@ -578,7 +630,7 @@ internal class MigrationJob
         DateTime? currentTo = null;
         const int pageSize = 10000;
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = CreateTenantScope();
         var decomposer = scope.ServiceProvider.GetRequiredService<IEntryDecomposer>();
 
         while (true)
@@ -652,7 +704,7 @@ internal class MigrationJob
         DateTime? currentTo = null;
         const int pageSize = 10000;
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = CreateTenantScope();
         var decomposer = scope.ServiceProvider.GetRequiredService<ITreatmentDecomposer>();
 
         while (true)
@@ -725,7 +777,7 @@ internal class MigrationJob
         DateTime? currentTo = null;
         const int pageSize = 10000;
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = CreateTenantScope();
         var decomposer = scope.ServiceProvider.GetRequiredService<IDeviceStatusDecomposer>();
 
         while (true)
@@ -809,7 +861,7 @@ internal class MigrationJob
             UpdateCollectionProgress(collectionName, profiles.Length, 0, 0, false);
             UpdateOverallProgress();
 
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = CreateTenantScope();
             var decomposer = scope.ServiceProvider.GetRequiredService<Nocturne.Core.Contracts.V4.IProfileDecomposer>();
 
             foreach (var profile in profiles)
@@ -961,7 +1013,7 @@ internal class MigrationJob
         DateTime? currentTo = null;
         const int pageSize = 10000;
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = CreateTenantScope();
         var decomposer = scope.ServiceProvider.GetRequiredService<IActivityDecomposer>();
 
         while (true)
@@ -1025,7 +1077,7 @@ internal class MigrationJob
         var client = new MongoClient(_request.MongoConnectionString);
         var database = client.GetDatabase(_request.MongoDatabaseName);
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = CreateTenantScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<NocturneDbContext>();
 
         // List available collections
@@ -1196,7 +1248,7 @@ internal class MigrationJob
         if (doc.Contains("_id"))
             status.Id = doc["_id"].AsObjectId.ToString();
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = CreateTenantScope();
         var decomposer = scope.ServiceProvider.GetRequiredService<Core.Contracts.V4.IDeviceStatusDecomposer>();
         await decomposer.DecomposeAsync(status, ct);
     }
@@ -1241,7 +1293,7 @@ internal class MigrationJob
             LoopSettings = loopSettings,
         };
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = CreateTenantScope();
         var decomposer = scope.ServiceProvider.GetRequiredService<Nocturne.Core.Contracts.V4.IProfileDecomposer>();
         await decomposer.DecomposeAsync(profile, ct);
     }
@@ -1302,5 +1354,215 @@ internal class MigrationJob
 
         var bytes = SHA1.HashData(Encoding.UTF8.GetBytes(apiSecret));
         return Convert.ToHexStringLower(bytes);
+    }
+
+    private async Task MigrateSubjectsViaApiAsync(
+        HttpClient httpClient,
+        NocturneDbContext dbContext,
+        CancellationToken ct)
+    {
+        _currentOperation = "Migrating subjects";
+        var collectionName = "subjects";
+
+        var totalMigrated = 0L;
+        var totalFailed = 0L;
+        var totalSkipped = 0L;
+
+        try
+        {
+            // 1. Fetch roles to build name->permissions lookup
+            var rolePermissions = await FetchNightscoutRolePermissionsAsync(httpClient, ct);
+
+            // 2. Fetch subjects
+            var response = await httpClient.GetAsync("/api/v2/authorization/subjects", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Failed to fetch subjects: {StatusCode}. The API secret may lack admin access. Skipping subject migration.",
+                    response.StatusCode);
+                UpdateCollectionProgress(collectionName, 0, 0, 0, true);
+                return;
+            }
+
+            var content = await response.Content.ReadAsStringAsync(ct);
+            var subjects = System.Text.Json.JsonSerializer.Deserialize<NightscoutSubject[]>(
+                content,
+                s_caseInsensitiveJson) ?? [];
+
+            UpdateCollectionProgress(collectionName, subjects.Length, 0, 0, false);
+            UpdateOverallProgress();
+
+            // 3. Pre-load existing token hashes for duplicate detection
+            var existingHashes = await dbContext.Subjects
+                .Where(s => s.AccessTokenHash != null)
+                .Select(s => s.AccessTokenHash!)
+                .ToHashSetAsync(ct);
+
+            // 4. Pre-load existing Nocturne roles by name
+            var nocturneRoles = await dbContext.Roles
+                .ToDictionaryAsync(r => r.Name, r => r.Id, ct);
+
+            foreach (var subject in subjects)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(subject.AccessToken))
+                    {
+                        totalSkipped++;
+                        continue;
+                    }
+
+                    var tokenHash = HashAccessToken(subject.AccessToken);
+
+                    if (existingHashes.Contains(tokenHash))
+                    {
+                        totalSkipped++;
+                        continue;
+                    }
+
+                    // Determine if subject should be inactive ("denied" is only role)
+                    var isDenied = subject.Roles is ["denied"];
+
+                    var entity = new SubjectEntity
+                    {
+                        Id = Guid.CreateVersion7(),
+                        Name = subject.Name ?? "Unnamed",
+                        AccessTokenHash = tokenHash,
+                        AccessTokenPrefix = $"{(subject.Name ?? "unknown").ToLowerInvariant()}-{subject.AccessToken[..Math.Min(8, subject.AccessToken.Length)]}",
+                        IsActive = !isDenied,
+                        Notes = "Migrated from Nightscout. Consider rotating to a Nocturne token.",
+                        OriginalId = subject.MongoId ?? subject.Id,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                        ApprovalStatus = "Approved",
+                    };
+
+                    dbContext.Subjects.Add(entity);
+                    await dbContext.SaveChangesAsync(ct);
+
+                    // Assign roles
+                    foreach (var roleName in subject.Roles ?? [])
+                    {
+                        if (roleName == "denied")
+                            continue;
+
+                        if (!nocturneRoles.TryGetValue(roleName, out var roleId))
+                        {
+                            // Custom Nightscout role: create it with fetched permissions
+                            var permissions = rolePermissions.GetValueOrDefault(roleName, []);
+                            var roleEntity = new RoleEntity
+                            {
+                                Id = Guid.CreateVersion7(),
+                                Name = roleName,
+                                Description = "Migrated from Nightscout",
+                                Permissions = permissions,
+                                IsSystemRole = false,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow,
+                            };
+                            dbContext.Roles.Add(roleEntity);
+                            await dbContext.SaveChangesAsync(ct);
+                            roleId = roleEntity.Id;
+                            nocturneRoles[roleName] = roleId;
+                        }
+
+                        dbContext.SubjectRoles.Add(new SubjectRoleEntity
+                        {
+                            SubjectId = entity.Id,
+                            RoleId = roleId,
+                            AssignedAt = DateTime.UtcNow,
+                        });
+                    }
+
+                    await dbContext.SaveChangesAsync(ct);
+
+                    existingHashes.Add(tokenHash);
+                    totalMigrated++;
+                    UpdateCollectionProgress(collectionName, subjects.Length, totalMigrated, totalFailed, false);
+                    UpdateOverallProgress();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to migrate subject {Name}", subject.Name);
+                    totalFailed++;
+                    dbContext.ChangeTracker.Clear();
+                }
+            }
+
+            UpdateCollectionProgress(collectionName, subjects.Length, totalMigrated, totalFailed, true);
+            UpdateOverallProgress();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error migrating subjects via API");
+        }
+
+        _logger.LogInformation(
+            "Subject migration complete: {Migrated} migrated, {Skipped} skipped, {Failed} failed",
+            totalMigrated, totalSkipped, totalFailed);
+    }
+
+    /// <summary>
+    /// Fetches Nightscout role definitions and returns a name-to-permissions lookup.
+    /// Falls back gracefully if the endpoint is inaccessible.
+    /// </summary>
+    private async Task<Dictionary<string, List<string>>> FetchNightscoutRolePermissionsAsync(
+        HttpClient httpClient, CancellationToken ct)
+    {
+        var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var response = await httpClient.GetAsync("/api/v2/authorization/roles", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Failed to fetch Nightscout roles: {StatusCode}. Using default role mappings.", response.StatusCode);
+                return result;
+            }
+
+            var content = await response.Content.ReadAsStringAsync(ct);
+            var roles = System.Text.Json.JsonSerializer.Deserialize<NightscoutRole[]>(
+                content,
+                s_caseInsensitiveJson) ?? [];
+
+            foreach (var role in roles)
+            {
+                if (!string.IsNullOrWhiteSpace(role.Name))
+                {
+                    result[role.Name] = role.Permissions ?? [];
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error fetching Nightscout roles. Custom roles may not have correct permissions.");
+        }
+
+        return result;
+    }
+
+    private static string HashAccessToken(string accessToken)
+    {
+        var bytes = Encoding.UTF8.GetBytes(accessToken);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexStringLower(hash);
+    }
+
+    private record NightscoutSubject
+    {
+        public string? Id { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("_id")]
+        public string? MongoId { get; init; }
+        public string? Name { get; init; }
+        public List<string> Roles { get; init; } = [];
+        public string? AccessToken { get; init; }
+    }
+
+    private record NightscoutRole
+    {
+        public string? Name { get; init; }
+        public List<string> Permissions { get; init; } = [];
     }
 }

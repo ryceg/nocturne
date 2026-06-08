@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Nocturne.Core.Contracts.Audit;
 using Nocturne.Core.Models;
@@ -13,7 +14,7 @@ namespace Nocturne.Infrastructure.Data;
 /// Entity Framework DbContext for PostgreSQL database operations
 /// Multitenant architecture with per-tenant global query filters
 /// </summary>
-public class NocturneDbContext : DbContext
+public class NocturneDbContext : DbContext, IDataProtectionKeyContext
 {
     /// <summary>
     /// Initializes a new instance of the NocturneDbContext class
@@ -145,6 +146,12 @@ public class NocturneDbContext : DbContext
     public DbSet<TotpCredentialEntity> TotpCredentials { get; set; }
 
     /// <summary>
+    /// ASP.NET Core Data Protection key ring — persisted so keys survive container restarts.
+    /// Not tenant-scoped; no RLS.
+    /// </summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
+
+    /// <summary>
     /// Gets or sets the DataSourceMetadata table for user preferences about data sources
     /// </summary>
     public DbSet<DataSourceMetadataEntity> DataSourceMetadata { get; set; }
@@ -200,12 +207,23 @@ public class NocturneDbContext : DbContext
     /// </summary>
     public DbSet<LinkedRecordEntity> LinkedRecords { get; set; }
 
+    /// <summary>
+    /// Gets or sets the DedupReconcileState table tracking per-tenant reconciliation watermarks
+    /// </summary>
+    public DbSet<DedupReconcileStateEntity> DedupReconcileState { get; set; }
+
     // Connector Configuration entities
 
     /// <summary>
     /// Gets or sets the ConnectorConfigurations table for connector runtime configuration and encrypted secrets
     /// </summary>
     public DbSet<ConnectorConfigurationEntity> ConnectorConfigurations { get; set; }
+
+    /// <summary>
+    /// Gets or sets the PlatformSettings table for instance-wide platform configuration (not tenant-scoped).
+    /// Stores encrypted credentials for bot platforms (Discord, Slack, Telegram, WhatsApp) and future platform-level config.
+    /// </summary>
+    public DbSet<PlatformSettingsEntity> PlatformSettings { get; set; }
 
     // In-App Notification entities
 
@@ -252,6 +270,11 @@ public class NocturneDbContext : DbContext
     public DbSet<MemberInviteEntity> MemberInvites { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets the MembershipRequests table for tenant membership requests
+    /// </summary>
+    public DbSet<MembershipRequestEntity> MembershipRequests { get; set; } = null!;
+
+    /// <summary>
     /// Gets or sets the CompressionLowSuggestions table for compression low detection
     /// </summary>
     public DbSet<CompressionLowSuggestionEntity> CompressionLowSuggestions { get; set; }
@@ -278,6 +301,11 @@ public class NocturneDbContext : DbContext
     /// </summary>
     public DbSet<BolusEntity> Boluses { get; set; }
 
+    /// <summary>
+    /// Gets or sets the BasalInjections table for discrete long-acting basal insulin
+    /// injection records (MDI; v4 granular model).
+    /// </summary>
+    public DbSet<BasalInjectionEntity> BasalInjections { get; set; }
 
     /// <summary>
     /// Gets or sets the CarbIntakes table for carbohydrate intake records (v4 granular model)
@@ -490,6 +518,13 @@ public class NocturneDbContext : DbContext
     public DbSet<TenantAuditConfigEntity> TenantAuditConfig { get; set; }
 
     /// <summary>
+    /// Gets or sets the TenantDataRetentionConfig table for per-tenant soft-delete retention
+    /// </summary>
+    public DbSet<TenantDataRetentionConfigEntity> TenantDataRetentionConfig { get; set; }
+
+    public DbSet<TenantDemoConfigEntity> TenantDemoConfigs => Set<TenantDemoConfigEntity>();
+
+    /// <summary>
     /// Configure the database model and relationships
     /// </summary>
     /// <param name="modelBuilder">The model builder to configure</param>
@@ -505,6 +540,13 @@ public class NocturneDbContext : DbContext
 
         // Configure per-tenant global query filters
         ConfigureTenantFilters(modelBuilder);
+
+        // Tenant membership is "active" only while not revoked. Enforcing this once here
+        // keeps every membership query (auth gates, setup detection, admin listings) from
+        // having to repeat `RevokedAt == null`. The matching partial unique index
+        // (ix_tenant_members_tenant_subject, filtered on revoked_at IS NULL) lets a revoked
+        // membership coexist with a fresh active one, so re-adds remain valid.
+        modelBuilder.Entity<TenantMemberEntity>().HasQueryFilter(tm => tm.RevokedAt == null);
 
         // Configure cascade deletes from tenant to all tenant-scoped entities
         ConfigureTenantCascadeDeletes(modelBuilder);
@@ -1081,6 +1123,11 @@ public class NocturneDbContext : DbContext
             .HasDatabaseName("ix_connector_configurations_connector_name_tenant")
             .IsUnique();
 
+        modelBuilder.Entity<PlatformSettingsEntity>()
+            .HasIndex(ps => ps.Category)
+            .HasDatabaseName("ix_platform_settings_category")
+            .IsUnique();
+
         // InAppNotification indexes - optimized for user notification queries
         modelBuilder
             .Entity<InAppNotificationEntity>()
@@ -1269,7 +1316,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_sensor_glucose_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<SensorGlucoseEntity>()
@@ -1341,7 +1388,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_boluses_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<BolusEntity>()
@@ -1358,7 +1405,36 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.DataSource, e.SyncIdentifier })
             .HasDatabaseName("ix_boluses_tenant_source_sync_id")
             .IsUnique()
-            .HasFilter("sync_identifier IS NOT NULL");
+            .HasFilter("sync_identifier IS NOT NULL AND deleted_at IS NULL");
+
+        // BasalInjections indexes
+        modelBuilder
+            .Entity<BasalInjectionEntity>()
+            .HasIndex(e => e.Timestamp)
+            .HasDatabaseName("ix_basal_injections_timestamp")
+            .IsDescending();
+
+        modelBuilder
+            .Entity<BasalInjectionEntity>()
+            .HasIndex(e => new { e.TenantId, e.LegacyId })
+            .HasDatabaseName("ix_basal_injections_tenant_legacy_id")
+            .IsUnique()
+            .HasFilter("legacy_id IS NOT NULL");
+
+        modelBuilder
+            .Entity<BasalInjectionEntity>()
+            .HasIndex(e => e.CorrelationId)
+            .HasDatabaseName("ix_basal_injections_correlation_id");
+
+        // BasalInjection is the first consumer of the dormant soft-delete
+        // infrastructure, so the sync_identifier uniqueness filter must also
+        // exclude soft-deleted rows. ConfigureTenantFilters automatically
+        // applies the deleted_at IS NULL clause to runtime SELECTs.
+        modelBuilder.Entity<BasalInjectionEntity>()
+            .HasIndex(e => new { e.TenantId, e.DataSource, e.SyncIdentifier })
+            .HasDatabaseName("ix_basal_injections_tenant_source_sync_id")
+            .IsUnique()
+            .HasFilter("sync_identifier IS NOT NULL AND deleted_at IS NULL");
 
         // CarbIntakes indexes
         modelBuilder
@@ -1372,7 +1448,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_carb_intakes_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<CarbIntakeEntity>()
@@ -1389,7 +1465,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.DataSource, e.SyncIdentifier })
             .HasDatabaseName("ix_carb_intakes_tenant_source_sync_id")
             .IsUnique()
-            .HasFilter("sync_identifier IS NOT NULL");
+            .HasFilter("sync_identifier IS NOT NULL AND deleted_at IS NULL");
 
         // BGChecks indexes
         modelBuilder
@@ -1403,7 +1479,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_bg_checks_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<BGCheckEntity>()
@@ -1422,7 +1498,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_notes_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<NoteEntity>()
@@ -1441,7 +1517,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_device_events_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<DeviceEventEntity>()
@@ -1460,7 +1536,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_bolus_calculations_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<BolusCalculationEntity>()
@@ -1527,7 +1603,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_temp_basals_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<TempBasalEntity>()
@@ -1540,7 +1616,19 @@ public class NocturneDbContext : DbContext
             .HasDatabaseName("ix_temp_basals_tenant_start_timestamp")
             .IsDescending(false, true);
 
-        // Devices unique index is handled by [Index] attribute on entity
+        // Devices unique index (scoped to live records, per tenant).
+        // TenantId must be part of the key: devices are tenant-owned (FindByCategoryTypeAndSerialAsync
+        // is RLS-scoped to the current tenant) and the type/serial often carry shared, non-unique
+        // values — e.g. a pump's manufacturer/model ("Insulet"/"Omnipod 5") or the generic Loop
+        // uploader identity ("iPhone"/"unknown"). Without TenantId the constraint is global, so the
+        // first tenant to register such a device permanently blocks every other tenant's insert,
+        // surfacing as a 500 on devicestatus ingestion (and a network error in Loop).
+        modelBuilder
+            .Entity<DeviceEntity>()
+            .HasIndex(e => new { e.TenantId, e.Category, e.Type, e.Serial })
+            .HasDatabaseName("ix_devices_category_type_serial")
+            .IsUnique()
+            .HasFilter("deleted_at IS NULL");
 
         // V4 Profile Decomposition indexes
 
@@ -1556,7 +1644,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_therapy_settings_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<TherapySettingsEntity>()
@@ -1586,7 +1674,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_basal_schedules_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<BasalScheduleEntity>()
@@ -1616,7 +1704,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_carb_ratio_schedules_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<CarbRatioScheduleEntity>()
@@ -1646,7 +1734,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_sensitivity_schedules_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<SensitivityScheduleEntity>()
@@ -1676,7 +1764,7 @@ public class NocturneDbContext : DbContext
             .HasIndex(e => new { e.TenantId, e.LegacyId })
             .HasDatabaseName("ix_target_range_schedules_tenant_legacy_id")
             .IsUnique()
-            .HasFilter("legacy_id IS NOT NULL");
+            .HasFilter("legacy_id IS NOT NULL AND deleted_at IS NULL");
 
         modelBuilder
             .Entity<TargetRangeScheduleEntity>()
@@ -1700,15 +1788,23 @@ public class NocturneDbContext : DbContext
             .HasDatabaseName("ix_tenants_slug")
             .IsUnique();
 
+        // Unique share token for public dashboard resolution. Postgres allows multiple
+        // NULLs in a unique index, so tenants without sharing enabled don't collide.
+        modelBuilder.Entity<TenantEntity>()
+            .HasIndex(t => t.ShareToken)
+            .HasDatabaseName("ix_tenants_share_token")
+            .IsUnique();
+
         modelBuilder.Entity<TenantMemberEntity>()
             .HasIndex(tm => tm.SubjectId)
             .HasDatabaseName("ix_tenant_members_subject_id");
 
-        // PatientRecord: unique constraint — one record per tenant
+        // PatientRecord: unique constraint — one record per tenant (scoped to live records)
         modelBuilder.Entity<PatientRecordEntity>()
             .HasIndex(e => e.TenantId)
             .HasDatabaseName("ix_patient_records_tenant_id")
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("deleted_at IS NULL");
 
         // PatientDevice: query by tenant + current status
         modelBuilder.Entity<PatientDeviceEntity>()
@@ -1875,6 +1971,10 @@ public class NocturneDbContext : DbContext
             .Entity<TenantAuditConfigEntity>()
             .Property(a => a.Id)
             .HasValueGenerator<GuidV7ValueGenerator>();
+        modelBuilder
+            .Entity<TenantDataRetentionConfigEntity>()
+            .Property(a => a.Id)
+            .HasValueGenerator<GuidV7ValueGenerator>();
 
         // Tracker entity UUID generators
         modelBuilder
@@ -1915,6 +2015,11 @@ public class NocturneDbContext : DbContext
             .HasValueGenerator<GuidV7ValueGenerator>();
 
         modelBuilder
+            .Entity<PlatformSettingsEntity>()
+            .Property(ps => ps.Id)
+            .HasValueGenerator<GuidV7ValueGenerator>();
+
+        modelBuilder
             .Entity<CompressionLowSuggestionEntity>()
             .Property(c => c.Id)
             .HasValueGenerator<GuidV7ValueGenerator>();
@@ -1934,6 +2039,10 @@ public class NocturneDbContext : DbContext
             .HasValueGenerator<GuidV7ValueGenerator>();
         modelBuilder
             .Entity<BolusEntity>()
+            .Property(e => e.Id)
+            .HasValueGenerator<GuidV7ValueGenerator>();
+        modelBuilder
+            .Entity<BasalInjectionEntity>()
             .Property(e => e.Id)
             .HasValueGenerator<GuidV7ValueGenerator>();
         modelBuilder
@@ -2463,11 +2572,28 @@ public class NocturneDbContext : DbContext
                 .HasDatabaseName("ix_tenant_audit_config_tenant_id");
         });
 
+        // Configure Tenant Data Retention Config entity defaults and indexes
+        modelBuilder.Entity<TenantDataRetentionConfigEntity>(entity =>
+        {
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => e.TenantId)
+                .IsUnique()
+                .HasDatabaseName("ix_tenant_data_retention_config_tenant_id");
+        });
+
         // Configure LinkedRecordEntity defaults
         modelBuilder.Entity<LinkedRecordEntity>(entity =>
         {
             entity.Property(e => e.IsPrimary).HasDefaultValue(false);
             entity.Property(e => e.SysCreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        // Configure DedupReconcileStateEntity — one row per tenant, PK on tenant id.
+        modelBuilder.Entity<DedupReconcileStateEntity>(entity =>
+        {
+            entity.HasKey(e => e.TenantId);
         });
 
         // Configure InAppNotification entity
@@ -2532,6 +2658,12 @@ public class NocturneDbContext : DbContext
             entity.Property(e => e.IssuedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity
+                .HasOne<TenantEntity>()
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity
                 .HasOne(e => e.Grant)
                 .WithMany(g => g.RefreshTokens)
                 .HasForeignKey(e => e.GrantId)
@@ -2594,6 +2726,16 @@ public class NocturneDbContext : DbContext
 
             entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.HasIndex(e => e.TenantId);
+        });
+
+        // Configure Membership Request entity
+        modelBuilder.Entity<MembershipRequestEntity>(entity =>
+        {
+            entity.Property(e => e.Id).HasValueGenerator<GuidV7ValueGenerator>();
+
+            entity.HasIndex(e => new { e.TenantId, e.SubjectId })
+                .HasFilter("status = 'pending'")
+                .IsUnique();
         });
 
         // Configure ClockFace entity
@@ -3079,6 +3221,14 @@ public class NocturneDbContext : DbContext
                 }
                 bolusEntity.SysUpdatedAt = utcNow;
             }
+            else if (entry.Entity is BasalInjectionEntity basalInjectionEntity)
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    basalInjectionEntity.SysCreatedAt = utcNow;
+                }
+                basalInjectionEntity.SysUpdatedAt = utcNow;
+            }
             else if (entry.Entity is CarbIntakeEntity carbIntakeEntity)
             {
                 if (entry.State == EntityState.Added)
@@ -3199,6 +3349,14 @@ public class NocturneDbContext : DbContext
                     tenantMemberEntity.SysCreatedAt = utcNow;
                 }
                 tenantMemberEntity.SysUpdatedAt = utcNow;
+            }
+            else if (entry.Entity is PlatformSettingsEntity platformSettingsEntity)
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    platformSettingsEntity.SysCreatedAt = utcNow;
+                }
+                platformSettingsEntity.SysUpdatedAt = utcNow;
             }
         }
     }

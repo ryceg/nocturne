@@ -2,6 +2,7 @@
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { getAnalysisDetail } from "../data.remote";
+  import { formatDateTimeCompact } from "$lib/utils/formatting";
 
   // Get ID from route params (guaranteed to exist in [id] route)
   const analysisId = $derived(page.params.id ?? "");
@@ -78,11 +79,6 @@
     return types[type] || "Unknown";
   }
 
-  // Format timestamp
-  function formatTime(timestamp: Date | string | undefined) {
-    if (!timestamp) return "N/A";
-    return new Date(timestamp).toLocaleString();
-  }
 
   // Format duration
   function formatDuration(ms: number) {
@@ -101,7 +97,7 @@
   const matchType = $derived(getMatchTypeDisplay(analysis.overallMatch ?? 0));
 </script>
 
-<div class="container mx-auto p-6 space-y-6">
+<div class="@container container mx-auto p-6 space-y-6">
   <!-- Header with Back Button -->
   <div class="flex items-center gap-4">
     <button
@@ -116,14 +112,14 @@
   <!-- Overview Card -->
   <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
     <h2 class="text-xl font-semibold mb-4">Overview</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3 gap-4">
       <div>
         <p class="text-sm text-gray-500 dark:text-gray-400">Correlation ID</p>
         <p class="font-mono text-sm">{analysis.correlationId}</p>
       </div>
       <div>
         <p class="text-sm text-gray-500 dark:text-gray-400">Timestamp</p>
-        <p class="text-sm">{formatTime(analysis.analysisTimestamp)}</p>
+        <p class="text-sm">{formatDateTimeCompact(analysis.analysisTimestamp)}</p>
       </div>
       <div>
         <p class="text-sm text-gray-500 dark:text-gray-400">Overall Match</p>
@@ -137,7 +133,7 @@
         <p class="text-sm text-gray-500 dark:text-gray-400">Request Method</p>
         <p class="font-mono font-semibold">{analysis.requestMethod}</p>
       </div>
-      <div class="md:col-span-2">
+      <div class="@lg:col-span-2">
         <p class="text-sm text-gray-500 dark:text-gray-400">Request Path</p>
         <p class="font-mono text-sm break-all">{analysis.requestPath}</p>
       </div>
@@ -145,7 +141,7 @@
   </div>
 
   <!-- Status Codes & Response Times -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div class="grid grid-cols-1 @lg:grid-cols-2 gap-6">
     <!-- Status Codes -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       <h2 class="text-xl font-semibold mb-4">Status Codes</h2>
@@ -224,7 +220,7 @@
   {#if analysis.selectedResponseTarget}
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       <h2 class="text-xl font-semibold mb-4">Response Selection</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 @lg:grid-cols-2 gap-4">
         <div>
           <p class="text-sm text-gray-500 dark:text-gray-400">
             Selected Target
@@ -281,7 +277,7 @@
                   </span>
                 </div>
                 <p class="text-sm mb-2">{disc.description}</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                <div class="grid grid-cols-1 @lg:grid-cols-2 gap-2 mt-2">
                   <div>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                       Nightscout Value
@@ -336,7 +332,7 @@
                   </span>
                 </div>
                 <p class="text-sm mb-2">{disc.description}</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                <div class="grid grid-cols-1 @lg:grid-cols-2 gap-2 mt-2">
                   <div>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                       Nightscout Value
@@ -391,7 +387,7 @@
                   </span>
                 </div>
                 <p class="text-sm mb-2">{disc.description}</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                <div class="grid grid-cols-1 @lg:grid-cols-2 gap-2 mt-2">
                   <div>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                       Nightscout Value

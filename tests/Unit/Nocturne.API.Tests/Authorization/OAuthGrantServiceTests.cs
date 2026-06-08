@@ -188,6 +188,7 @@ public class OAuthGrantServiceTests : IDisposable
         db.OAuthRefreshTokens.Add(new OAuthRefreshTokenEntity
         {
             Id = Guid.CreateVersion7(),
+            TenantId = _testTenantId,
             GrantId = grantId,
             TokenHash = "test-hash-1",
             IssuedAt = DateTime.UtcNow,
@@ -196,6 +197,7 @@ public class OAuthGrantServiceTests : IDisposable
         db.OAuthRefreshTokens.Add(new OAuthRefreshTokenEntity
         {
             Id = Guid.CreateVersion7(),
+            TenantId = _testTenantId,
             GrantId = grantId,
             TokenHash = "test-hash-2",
             IssuedAt = DateTime.UtcNow,

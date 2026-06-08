@@ -5,7 +5,6 @@
     get as getDnd,
     update as updateDnd,
   } from "$api/generated/tenantAlertSettings.generated.remote";
-  import { getProfileSummary } from "$api/generated/profiles.generated.remote";
   import type { TenantAlertSettingsResponse } from "$api-clients";
 
   import { Button } from "$lib/components/ui/button";
@@ -19,12 +18,9 @@
     CardTitle,
     CardDescription,
   } from "$lib/components/ui/card";
-  import * as Select from "$lib/components/ui/select";
   import { ArrowLeft, BellOff, Save, Loader2 } from "lucide-svelte";
 
-  // Queries seed the form once on first response.
   const dndQuery = getDnd();
-  const profileQuery = getProfileSummary(undefined);
 
   let saving = $state(false);
   let error = $state<string | null>(null);
@@ -35,28 +31,11 @@
   let dndScheduleEnabled = $state(false);
   let dndScheduleStart = $state("22:00");
   let dndScheduleEnd = $state("06:00");
-  let timezone = $state<string>("UTC");
-
-  // Common IANA timezones — picker just exposes a small set; power users can
-  // type into the input directly. Keep the default suggestion list short to
-  // avoid drowning the user in choice.
-  const TIMEZONES = [
-    "UTC",
-    "America/New_York",
-    "America/Chicago",
-    "America/Denver",
-    "America/Los_Angeles",
-    "Europe/London",
-    "Europe/Berlin",
-    "Europe/Paris",
-    "Asia/Tokyo",
-    "Australia/Sydney",
-  ];
 
   // Convert a UTC ISO string into a `datetime-local` input value (YYYY-MM-
   // DDTHH:mm) in the *browser's* local zone — keeps the form usable without
   // re-implementing tz conversion. The save path round-trips back to UTC.
-  function isoToLocal(iso: string | null | undefined): string {
+  function isoToLocal(iso: string | Date | null | undefined): string {
     if (!iso) return "";
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "";
@@ -70,37 +49,21 @@
     return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
   }
 
-  function browserTimezone(): string | null {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
-    } catch {
-      return null;
-    }
-  }
-
-  function applyResponse(
-    r: TenantAlertSettingsResponse | null,
-    fallbackTz: string | null,
-  ): void {
+  function applyResponse(r: TenantAlertSettingsResponse | null): void {
     dndManualActive = r?.dndManualActive ?? false;
     dndManualUntilLocal = isoToLocal(r?.dndManualUntil);
     dndScheduleEnabled = r?.dndScheduleEnabled ?? false;
     dndScheduleStart = r?.dndScheduleStart ?? "22:00";
     dndScheduleEnd = r?.dndScheduleEnd ?? "06:00";
-    timezone = r?.timezone || fallbackTz || browserTimezone() || "UTC";
   }
 
   // Seed form state from query results on first successful response. Subsequent
   // refreshes do NOT clobber user edits.
   $effect(() => {
     const dnd = dndQuery.current;
-    const summary = profileQuery.current;
     if (seeded || dnd === undefined) return;
     untrack(() => {
-      const profileTz =
-        (summary?.therapySettings?.find((ts) => ts.isDefault) ??
-          summary?.therapySettings?.[0])?.timezone ?? null;
-      applyResponse(dnd ?? null, profileTz);
+      applyResponse(dnd ?? null);
       seeded = true;
     });
   });
@@ -115,9 +78,8 @@
         dndScheduleEnabled,
         dndScheduleStart: dndScheduleEnabled ? dndScheduleStart : undefined,
         dndScheduleEnd: dndScheduleEnabled ? dndScheduleEnd : undefined,
-        timezone,
       });
-      applyResponse(r, timezone);
+      applyResponse(r);
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to save DND settings";
     } finally {
@@ -130,8 +92,8 @@
   <title>Do Not Disturb · Alerts · Nocturne</title>
 </svelte:head>
 
-<div class="container mx-auto max-w-3xl p-4 lg:p-6 space-y-6">
-  <div class="flex items-center justify-between gap-2">
+<div class="@container container mx-auto max-w-3xl p-3 @md:p-6 space-y-6">
+  <div class="flex flex-col gap-3 @lg:flex-row @lg:items-center @lg:justify-between">
     <div class="flex items-center gap-2">
       <Button
         type="button"
@@ -151,7 +113,7 @@
         </p>
       </div>
     </div>
-    <Button onclick={save} disabled={saving || !seeded}>
+    <Button class="shrink-0" onclick={save} disabled={saving || !seeded}>
       {#if saving}
         <Loader2 class="h-4 w-4 mr-2 animate-spin" />
       {:else}
@@ -176,7 +138,7 @@
         <Switch
           id="dnd-manual"
           checked={dndManualActive}
-          onCheckedChange={(c) => (dndManualActive = c)}
+          onCheckedChange={(c: boolean) => (dndManualActive = c)}
         />
       </div>
       {#if dndManualActive}
@@ -186,7 +148,8 @@
             id="dnd-until"
             type="datetime-local"
             value={dndManualUntilLocal}
-            oninput={(e) => (dndManualUntilLocal = e.currentTarget.value)}
+            oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
+              (dndManualUntilLocal = e.currentTarget.value)}
           />
           <p class="text-xs text-muted-foreground">Leave blank to keep DND on indefinitely.</p>
         </div>
@@ -205,18 +168,19 @@
         <Switch
           id="dnd-schedule"
           checked={dndScheduleEnabled}
-          onCheckedChange={(c) => (dndScheduleEnabled = c)}
+          onCheckedChange={(c: boolean) => (dndScheduleEnabled = c)}
         />
       </div>
       {#if dndScheduleEnabled}
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-4 @sm:grid-cols-2">
           <div class="space-y-2">
             <Label for="dnd-start">From</Label>
             <Input
               id="dnd-start"
               type="time"
               value={dndScheduleStart}
-              oninput={(e) => (dndScheduleStart = e.currentTarget.value)}
+              oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
+                (dndScheduleStart = e.currentTarget.value)}
             />
           </div>
           <div class="space-y-2">
@@ -225,26 +189,15 @@
               id="dnd-end"
               type="time"
               value={dndScheduleEnd}
-              oninput={(e) => (dndScheduleEnd = e.currentTarget.value)}
+              oninput={(e: Event & { currentTarget: HTMLInputElement }) =>
+                (dndScheduleEnd = e.currentTarget.value)}
             />
           </div>
         </div>
-        <div class="space-y-2">
-          <Label>Timezone</Label>
-          <Select.Root
-            type="single"
-            value={timezone}
-            onValueChange={(v) => (timezone = v)}
-          >
-            <Select.Trigger>{timezone}</Select.Trigger>
-            <Select.Content>
-              {#each Array.from(new Set([timezone, ...TIMEZONES])).filter(Boolean) as tz (tz)}
-                <Select.Item value={tz} label={tz} />
-              {/each}
-            </Select.Content>
-          </Select.Root>
-          <p class="text-xs text-muted-foreground">Falls back to UTC if the value can't be resolved at evaluation time.</p>
-        </div>
+        <p class="text-xs text-muted-foreground">
+          Scheduled windows are interpreted in your timezone, set on your
+          <a href="/settings/patient" class="underline">patient record</a>.
+        </p>
       {/if}
     </CardContent>
   </Card>

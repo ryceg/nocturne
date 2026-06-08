@@ -109,7 +109,7 @@ public static class TenantCommandExtensions
                 var flagStr = flags.Count > 0 ? $" ({string.Join(", ", flags)})" : "";
 
                 md.AppendLine($"### {t.Slug}{flagStr}");
-                md.AppendLine($"**{t.DisplayName}** | {t.Timezone} | {t.Members} members");
+                md.AppendLine($"**{t.DisplayName}** | {t.Members} members");
                 md.AppendLine();
                 md.AppendLine($"| Entries | Treatments | Device Statuses | Profiles |");
                 md.AppendLine($"|---------|------------|-----------------|----------|");

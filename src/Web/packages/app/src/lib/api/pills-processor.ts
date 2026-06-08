@@ -19,7 +19,7 @@ import type {
 	AlertLevel,
 	StatusPillsConfig
 } from '$lib/types/status-pills';
-import type { Bolus, CarbIntake, DeviceEvent, ApsSnapshot } from '$lib/api';
+import type { Bolus, CarbIntake, DeviceEvent, ApsSnapshot, ProfileSummary } from '$lib/api';
 import { DeviceEventType } from '$lib/api';
 
 /**
@@ -51,24 +51,6 @@ export interface DeviceStatus {
 	connect?: any;
 }
 
-/**
- * Profile represents therapy settings/profile data
- * Mirrors Nightscout profile structure
- */
-export interface Profile {
-	_id?: string;
-	defaultProfile?: string;
-	startDate?: string;
-	mills?: number;
-	created_at?: string;
-	units?: string;
-	store?: Record<string, any>;
-	enteredBy?: string;
-	loopSettings?: any;
-	isExternallyManaged?: boolean;
-	icon?: string;
-	timezone?: string;
-}
 
 // Re-export the default config
 export { DEFAULT_PILLS_CONFIG } from '$lib/types/status-pills';
@@ -157,7 +139,7 @@ export function processPillsData(
 	boluses: Bolus[],
 	carbIntakes: CarbIntake[],
 	deviceEvents: DeviceEvent[],
-	profile: Profile | null,
+	profile: ProfileSummary | null,
 	config: Partial<PillsProcessorConfig> = {}
 ): ProcessedPillsData {
 	const now = config.now ?? Date.now();
@@ -257,7 +239,7 @@ function processCOBFromSnapshot(
 
 function processBasalFromSnapshot(
 	snapshots: ApsSnapshot[],
-	profile: Profile | null,
+	profile: ProfileSummary | null,
 	now: number,
 	_config: Partial<PillsProcessorConfig>
 ): BasalPillData | null {
@@ -735,71 +717,58 @@ export function processSAGE(
 }
 
 /**
- * Profile time-value entry structure
+ * Resolve the active profile name from a V4 ProfileSummary: prefer the therapy
+ * settings record marked IsDefault; fall back to the first record's name.
  */
-interface TimeValueEntry {
-	time?: string;
-	value?: number;
+function getActiveProfileName(profile: ProfileSummary | null): string | null {
+	const settings = profile?.therapySettings;
+	if (!settings || settings.length === 0) return null;
+	const explicit = settings.find((t) => t.isDefault);
+	return explicit?.profileName ?? settings[0]?.profileName ?? null;
 }
 
 /**
- * Get the scheduled basal rate from a profile for a given time
- * @param profile The profile containing basal schedule
- * @param now Current timestamp in milliseconds
- * @returns The scheduled basal rate in U/hr, or 0 if not found
+ * Get the scheduled basal rate from a V4 ProfileSummary for a given time.
+ * Picks the BasalSchedule whose ProfileName matches the active profile, then
+ * finds the latest entry whose time is at or before the current time of day
+ * (with last-entry wraparound across midnight).
  */
-function getScheduledBasalRate(profile: Profile | null, now: number): { rate: number; profileName: string | null } {
-	if (!profile) {
-		return { rate: 0, profileName: null };
+function getScheduledBasalRate(profile: ProfileSummary | null, now: number): { rate: number; profileName: string | null } {
+	const profileName = getActiveProfileName(profile);
+	if (!profileName) return { rate: 0, profileName: null };
+
+	const schedule = profile?.basalSchedules?.find((b) => b.profileName === profileName);
+	const entries = schedule?.entries;
+	if (!entries || entries.length === 0) {
+		return { rate: 0, profileName };
 	}
 
-	// Get the active profile name
-	const activeProfileName = profile.defaultProfile;
-	if (!activeProfileName || !profile.store) {
-		return { rate: 0, profileName: null };
-	}
-
-	// Get the profile data from the store
-	const profileData = profile.store[activeProfileName] as { basal?: TimeValueEntry[] } | undefined;
-	if (!profileData?.basal || profileData.basal.length === 0) {
-		return { rate: 0, profileName: activeProfileName };
-	}
-
-	// Get current time of day
 	const date = new Date(now);
 	const currentMinutes = date.getHours() * 60 + date.getMinutes();
 
-	// Convert time string (HH:MM) to minutes
 	function timeToMinutes(time: string): number {
 		const [hours, minutes] = time.split(':').map(Number);
 		return hours * 60 + (minutes || 0);
 	}
 
-	// Sort basal entries by time
-	const sortedBasal = [...profileData.basal]
-		.filter((entry): entry is { time: string; value: number } =>
-			entry.time !== undefined && entry.value !== undefined
+	const sorted = entries
+		.filter((e): e is { time: string; value: number; timeAsSeconds?: number } =>
+			typeof e.time === 'string' && typeof e.value === 'number'
 		)
 		.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
-	if (sortedBasal.length === 0) {
-		return { rate: 0, profileName: activeProfileName };
-	}
+	if (sorted.length === 0) return { rate: 0, profileName };
 
-	// Find the basal entry that applies at the current time
-	// (the last entry with a start time <= current time)
-	let currentRate = sortedBasal[sortedBasal.length - 1].value; // Default to last entry (wraps around midnight)
-
-	for (const entry of sortedBasal) {
-		const entryMinutes = timeToMinutes(entry.time);
-		if (entryMinutes <= currentMinutes) {
+	let currentRate = sorted[sorted.length - 1].value; // wraps across midnight
+	for (const entry of sorted) {
+		if (timeToMinutes(entry.time) <= currentMinutes) {
 			currentRate = entry.value;
 		} else {
 			break;
 		}
 	}
 
-	return { rate: currentRate, profileName: activeProfileName };
+	return { rate: currentRate, profileName };
 }
 
 /**
@@ -807,7 +776,7 @@ function getScheduledBasalRate(profile: Profile | null, now: number): { rate: nu
  */
 export function processBasal(
 	deviceStatuses: DeviceStatus[],
-	profile: Profile | null,
+	profile: ProfileSummary | null,
 	now: number,
 	_units: string,
 	_config: Partial<PillsProcessorConfig> = {}

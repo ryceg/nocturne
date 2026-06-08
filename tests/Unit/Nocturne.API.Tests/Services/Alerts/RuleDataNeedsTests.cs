@@ -236,6 +236,22 @@ public class RuleDataNeedsTests
     }
 
     [Fact]
+    public void TimeOfDay_rule_sets_TenantTimeZone_so_evaluator_can_fall_back_to_tenant_tz()
+    {
+        // TimeOfDayEvaluator falls back to SensorContext.TenantTimeZoneId when the rule's
+        // own Timezone is null (which is the default the UI saves). Without requesting the
+        // tenant timezone here, the enricher would skip the TherapySettings fetch and the
+        // evaluator would silently fall back to UTC — firing at the wrong wall-clock hour
+        // for non-UTC tenants.
+        var rule = MakeRule(AlertConditionType.TimeOfDay,
+            """{"from":"10:00","to":"14:00","timezone":null}""");
+
+        var result = RuleDataNeeds.Walk(new[] { rule });
+
+        result.NeedsTenantTimeZone.Should().BeTrue();
+    }
+
+    [Fact]
     public void Composite_with_loop_stale_inside_not_sustained_sets_LastApsCycle()
     {
         var json = """

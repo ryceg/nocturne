@@ -7,8 +7,10 @@ import { SyncDataType } from '$api/generated/nocturne-api-client';
 const DATA_TYPE_LABELS: Record<SyncDataType, string> = {
 	[SyncDataType.Glucose]: 'Glucose',
 	[SyncDataType.ManualBG]: 'Manual BG',
+	[SyncDataType.Calibrations]: 'Calibrations',
 	[SyncDataType.Boluses]: 'Boluses',
 	[SyncDataType.CarbIntake]: 'Carb Intake',
+	[SyncDataType.BGChecks]: 'BG Checks',
 	[SyncDataType.BolusCalculations]: 'Bolus Calculations',
 	[SyncDataType.Notes]: 'Notes',
 	[SyncDataType.DeviceEvents]: 'Device Events',

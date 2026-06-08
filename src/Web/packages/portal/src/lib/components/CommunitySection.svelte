@@ -1,7 +1,7 @@
 <script lang="ts">
     import { Button } from "@nocturne/ui/ui/button";
     import { Star, GitFork, Users, Tag } from "@lucide/svelte";
-    import type { GitHubContributor } from "$lib/data/portal.remote";
+    import type { GitHubContributor } from "$lib/data/portal";
 
     interface Props {
         stars: number;

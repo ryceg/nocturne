@@ -9,6 +9,7 @@ using Nocturne.Core.Contracts.Infrastructure;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Entities;
 using Nocturne.Infrastructure.Data.Repositories.V4;
+using Nocturne.Tests.Shared.Infrastructure;
 using Xunit;
 
 namespace Nocturne.Infrastructure.Data.Tests.Repositories;
@@ -69,7 +70,7 @@ public class CarbIntakeRepositoryTests : IDisposable
             .Returns(Task.CompletedTask);
 
         _repo = new CarbIntakeRepository(
-            _context,
+            new TestTenantDbContextFactory(_context),
             _mockDeduplicationService.Object,
             new Mock<IAuditContext>().Object,
             NullLogger<CarbIntakeRepository>.Instance);
@@ -193,6 +194,66 @@ public class CarbIntakeRepositoryTests : IDisposable
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task CountAsync_ExcludesNonPrimaryDuplicates()
+    {
+        var timestamp = DateTime.UtcNow;
+
+        // The same meal imported by two connectors (e.g. MyLife pump data that
+        // also flows through Glooko) — two distinct rows.
+        var primary = await _repo.CreateAsync(new CarbIntake
+        {
+            Timestamp = timestamp,
+            DataSource = "mylife-connector",
+            LegacyId = "mylife-1",
+            Carbs = 50.0,
+        });
+        var duplicate = await _repo.CreateAsync(new CarbIntake
+        {
+            Timestamp = timestamp,
+            DataSource = "glooko-connector",
+            LegacyId = "glooko-1",
+            Carbs = 50.0,
+        });
+
+        // Dedup links them into one canonical group; the Glooko row is non-primary.
+        var canonicalId = Guid.CreateVersion7();
+        var mills = new DateTimeOffset(timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds();
+        _context.LinkedRecords.AddRange(
+            new LinkedRecordEntity
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = TestTenantId,
+                CanonicalId = canonicalId,
+                RecordType = "carbintake",
+                RecordId = primary.Id,
+                SourceTimestamp = mills,
+                DataSource = "mylife-connector",
+                IsPrimary = true,
+            },
+            new LinkedRecordEntity
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = TestTenantId,
+                CanonicalId = canonicalId,
+                RecordType = "carbintake",
+                RecordId = duplicate.Id,
+                SourceTimestamp = mills,
+                DataSource = "glooko-connector",
+                IsPrimary = false,
+            });
+        await _context.SaveChangesAsync();
+
+        // GetAsync already drops the non-primary duplicate; CountAsync must agree
+        // so pagination totals match the returned rows.
+        var fetched = (await _repo.GetAsync(
+            from: null, to: null, device: null, source: null)).ToList();
+        var count = await _repo.CountAsync(from: null, to: null);
+
+        fetched.Should().HaveCount(1);
+        count.Should().Be(1);
     }
 
     [Fact]

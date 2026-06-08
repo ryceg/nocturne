@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +60,7 @@ public static class ServiceCollectionExtensions
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(
             postgreSqlConfig.ConnectionString
         );
+        dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize = postgreSqlConfig.MaxPoolSize;
         var dataSource = dataSourceBuilder.Build();
         services.AddSingleton(dataSource);
 
@@ -111,6 +114,9 @@ public static class ServiceCollectionExtensions
             }
             return context;
         });
+
+        // Register tenant-aware context factory for V4 repositories
+        services.AddScoped<ITenantDbContextFactory, TenantDbContextFactory>();
 
         // Register deduplication service (required by repositories)
         services.AddScoped<IDeduplicationService, DeduplicationService>();
@@ -171,6 +177,7 @@ public static class ServiceCollectionExtensions
             options.MaxRetryCount = config.MaxRetryCount;
             options.MaxRetryDelaySeconds = config.MaxRetryDelaySeconds;
             options.CommandTimeoutSeconds = config.CommandTimeoutSeconds;
+            options.MaxPoolSize = config.MaxPoolSize;
         });
 
         // Register interceptors as singletons so caches are shared across all DbContext instances.
@@ -182,6 +189,7 @@ public static class ServiceCollectionExtensions
 
         // Register NpgsqlDataSource as a singleton - this manages the connection pool
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(config.ConnectionString);
+        dataSourceBuilder.ConnectionStringBuilder.MaxPoolSize = config.MaxPoolSize;
         var dataSource = dataSourceBuilder.Build();
         services.AddSingleton(dataSource);
 
@@ -248,6 +256,9 @@ public static class ServiceCollectionExtensions
             }
             return context;
         });
+
+        // Register tenant-aware context factory for V4 repositories
+        services.AddScoped<ITenantDbContextFactory, TenantDbContextFactory>();
 
         // Register deduplication service (required by repositories)
         services.AddScoped<IDeduplicationService, DeduplicationService>();
@@ -322,4 +333,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITreatmentFoodRepository, TreatmentFoodRepository>();
         return services;
     }
+
+    /// <summary>
+    /// Persists Data Protection keys to <see cref="NocturneDbContext"/> so the key ring
+    /// survives container restarts. Call this on the builder returned by
+    /// <c>services.AddDataProtection()</c>.
+    /// </summary>
+    public static IDataProtectionBuilder PersistKeysToNocturneDb(
+        this IDataProtectionBuilder builder)
+        => builder.PersistKeysToDbContext<NocturneDbContext>();
 }

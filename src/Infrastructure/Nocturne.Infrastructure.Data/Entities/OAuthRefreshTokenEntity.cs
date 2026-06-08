@@ -8,13 +8,20 @@ namespace Nocturne.Infrastructure.Data.Entities;
 /// (same app on two devices). Refresh tokens are rotated on each use.
 /// </summary>
 [Table("oauth_refresh_tokens")]
-public class OAuthRefreshTokenEntity
+public class OAuthRefreshTokenEntity : ITenantScoped
 {
     /// <summary>
     /// Primary key - UUID Version 7
     /// </summary>
     [Key]
     public Guid Id { get; set; }
+
+    /// <summary>
+    /// Tenant that owns this token (denormalized from the parent grant for RLS)
+    /// </summary>
+    [Required]
+    [Column("tenant_id")]
+    public Guid TenantId { get; set; }
 
     /// <summary>
     /// Foreign key to the grant this token belongs to

@@ -2,6 +2,7 @@ import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
 import { describe, it, expect, vi } from "vitest";
 import ChartLegend from "./ChartLegend.svelte";
+import { SystemEventType } from "$lib/api";
 
 function createDefaultProps(
 	overrides: Partial<Parameters<typeof ChartLegend>[1]> = {},
@@ -35,7 +36,7 @@ function createDefaultProps(
 		onToggleProfileSpans: vi.fn(),
 		onToggleActivitySpans: vi.fn(),
 		deviceEventMarkers: [] as { eventType?: string }[],
-		systemEvents: [] as { id?: string; eventType?: string; color?: string }[],
+		systemEvents: [] as { id?: string; eventType?: SystemEventType; color?: string }[],
 		pumpModeSpans: [] as { state?: string; color?: string }[],
 		scheduledTrackerMarkers: [] as { id?: string }[],
 		currentPumpMode: undefined as string | undefined,
@@ -139,8 +140,8 @@ describe("ChartLegend", () => {
 			ChartLegend,
 			createDefaultProps({
 				systemEvents: [
-					{ id: "1", eventType: "Alarm", color: "red" },
-					{ id: "2", eventType: "Alarm", color: "red" },
+					{ id: "1", eventType: SystemEventType.Alarm, color: "red" },
+					{ id: "2", eventType: SystemEventType.Alarm, color: "red" },
 				],
 			}),
 		);

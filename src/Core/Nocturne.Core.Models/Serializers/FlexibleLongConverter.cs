@@ -23,7 +23,9 @@ public class FlexibleLongConverter : JsonConverter<long>
         switch (reader.TokenType)
         {
             case JsonTokenType.Number:
-                return reader.GetInt64();
+                if (reader.TryGetInt64(out var longVal))
+                    return longVal;
+                return (long)reader.GetDouble();
 
             case JsonTokenType.String:
                 var stringValue = reader.GetString();
@@ -69,7 +71,9 @@ public class FlexibleNullableLongConverter : JsonConverter<long?>
         switch (reader.TokenType)
         {
             case JsonTokenType.Number:
-                return reader.GetInt64();
+                if (reader.TryGetInt64(out var longVal))
+                    return longVal;
+                return (long)reader.GetDouble();
 
             case JsonTokenType.String:
                 var stringValue = reader.GetString();

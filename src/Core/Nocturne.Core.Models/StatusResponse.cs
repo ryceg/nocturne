@@ -107,4 +107,27 @@ public class StatusResponse
     /// </summary>
     [JsonPropertyName("head")]
     public string? Head { get; set; }
+
+    /// <summary>
+    /// Whether this tenant is a demo instance.
+    /// </summary>
+    [JsonPropertyName("isDemo")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsDemo { get; set; }
+
+    /// <summary>
+    /// When demo data will next be reset (null if disabled or not a demo).
+    /// </summary>
+    [JsonPropertyName("nextResetAt")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTime? NextResetAt { get; set; }
+
+    /// <summary>
+    /// Whether this tenant grants read access to anonymous (unauthenticated) callers —
+    /// i.e. the tenant's public subject carries a read permission. The web app uses this
+    /// per-tenant signal to decide whether an anonymous visitor may view the dashboard or
+    /// should be redirected to sign in.
+    /// </summary>
+    [JsonPropertyName("anonymousReadAccess")]
+    public bool AnonymousReadAccess { get; set; }
 }

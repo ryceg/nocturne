@@ -5,15 +5,9 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
-  import {
-    Clock,
-    Copy,
-    Check,
-    X,
-    Loader2,
-    Link,
-    EyeOff,
-  } from "lucide-svelte";
+  import { slide } from "svelte/transition";
+  import { flip } from "svelte/animate";
+  import { Clock, Copy, Check, X, Loader2, Link, EyeOff } from "lucide-svelte";
   import {
     getGuestLinks,
     createGuestLink,
@@ -26,22 +20,28 @@
   } from "$api/generated/nocturne-api-client";
 
   const effectivePermissions: string[] = $derived(
-    (page.data as any).effectivePermissions ?? [],
+    (page.data as any).effectivePermissions ?? []
   );
   const hasStar = $derived(effectivePermissions.includes("*"));
   const canCreateGuestLinks = $derived(
-    hasStar || effectivePermissions.includes("sharing.guest"),
+    hasStar || effectivePermissions.includes("sharing.guest")
   );
 
   // UI state
   let showDismissed = $state(false);
-  let dismissingId = $state<string | null>(null);
+  let removingIds = $state(new Set<string>());
 
   // Query
-  const guestLinksQuery = $derived(canCreateGuestLinks ? getGuestLinks({ includeDismissed: true }) : null);
+  const guestLinksQuery = $derived(
+    canCreateGuestLinks ? getGuestLinks({ includeDismissed: true }) : null
+  );
   const allLinks = $derived(guestLinksQuery?.current ?? []);
-  const guestLinks = $derived(showDismissed ? allLinks : allLinks.filter(l => !l.dismissedAt));
-  const dismissedCount = $derived(allLinks.filter(l => l.dismissedAt).length);
+  const guestLinks = $derived(
+    (showDismissed ? allLinks : allLinks.filter((l) => !l.dismissedAt)).filter(
+      (l) => !removingIds.has(l.id!)
+    )
+  );
+  const dismissedCount = $derived(allLinks.filter((l) => l.dismissedAt).length);
   let showCreateForm = $state(false);
   let label = $state("");
   let isCreating = $state(false);
@@ -50,7 +50,6 @@
   let createdUrl = $state<string | null>(null);
   let copiedCode = $state(false);
   let copiedUrl = $state(false);
-  let revokingId = $state<string | null>(null);
 
   function statusLabel(status: GuestLinkStatus | undefined): string {
     switch (status) {
@@ -68,7 +67,7 @@
   }
 
   function statusVariant(
-    status: GuestLinkStatus | undefined,
+    status: GuestLinkStatus | undefined
   ): "default" | "secondary" | "destructive" | "outline" {
     switch (status) {
       case GuestLinkStatus.Active:
@@ -117,7 +116,8 @@
 
     let relative: string;
     if (minutes < 1) relative = "less than a minute";
-    else if (minutes < 60) relative = `${minutes} minute${minutes !== 1 ? "s" : ""}`;
+    else if (minutes < 60)
+      relative = `${minutes} minute${minutes !== 1 ? "s" : ""}`;
     else if (hours < 48) relative = `${hours} hour${hours !== 1 ? "s" : ""}`;
     else relative = `${days} day${days !== 1 ? "s" : ""}`;
 
@@ -125,7 +125,10 @@
   }
 
   function isTerminal(link: GuestLinkInfo): boolean {
-    return link.status === GuestLinkStatus.Revoked || link.status === GuestLinkStatus.Expired;
+    return (
+      link.status === GuestLinkStatus.Revoked ||
+      link.status === GuestLinkStatus.Expired
+    );
   }
 
   function canRevoke(link: GuestLinkInfo): boolean {
@@ -178,24 +181,22 @@
   }
 
   async function handleDismiss(id: string) {
-    dismissingId = id;
+    removingIds = new Set([...removingIds, id]);
     try {
       await dismissGuestLink(id);
     } catch {
-      // Silently fail — the list will refresh
-    } finally {
-      dismissingId = null;
+      // Restore on failure
+      removingIds = new Set([...removingIds].filter((x) => x !== id));
     }
   }
 
   async function handleRevoke(id: string) {
-    revokingId = id;
+    removingIds = new Set([...removingIds, id]);
     try {
       await revokeGuestLink(id);
     } catch {
-      // Silently fail — the list will refresh
-    } finally {
-      revokingId = null;
+      // Restore on failure
+      removingIds = new Set([...removingIds].filter((x) => x !== id));
     }
   }
 
@@ -244,8 +245,8 @@
         <Card.Header>
           <Card.Title class="text-lg">Create Guest Link</Card.Title>
           <Card.Description>
-            Generate a temporary code or link for read-only access. It expires in
-            48 hours and can only be used once.
+            Generate a temporary link for read-only access to reports. It
+            expires in 48 hours and can only be used once.
           </Card.Description>
         </Card.Header>
         <Card.Content>
@@ -388,60 +389,63 @@
     {:else if allLinks.length > 0}
       <div class="space-y-2">
         {#each guestLinks as link (link.id)}
-          <Card.Root>
-            <Card.Content class="flex items-center gap-4 py-3{link.dismissedAt ? ' opacity-50' : ''}">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-sm truncate">
-                    {link.label || "Untitled"}
-                  </span>
-                  <Badge variant={statusVariant(link.status)}>
-                    {statusLabel(link.status)}
-                  </Badge>
+          <div
+            transition:slide={{ duration: 300 }}
+            animate:flip={{ duration: 300 }}
+          >
+            <Card.Root>
+              <Card.Content
+                class="flex items-center gap-4 py-3{link.dismissedAt
+                  ? ' opacity-50'
+                  : ''}"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm truncate">
+                      {link.label || "Untitled"}
+                    </span>
+                    <Badge variant={statusVariant(link.status)}>
+                      {statusLabel(link.status)}
+                    </Badge>
+                  </div>
+                  <div
+                    class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1"
+                  >
+                    <span>Created {formatDate(link.createdAt)}</span>
+                    <span>{formatRelativeExpiry(link.expiresAt)}</span>
+                    {#if (link.status === GuestLinkStatus.Active || link.status === GuestLinkStatus.Revoked) && link.activatedAt}
+                      <span>
+                        Accessed {formatDate(link.activatedAt)}{link.activatedIp
+                          ? ` from ${maskIp(link.activatedIp)}`
+                          : ""}
+                      </span>
+                    {/if}
+                  </div>
                 </div>
-                <div
-                  class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1"
-                >
-                  <span>Created {formatDate(link.createdAt)}</span>
-                  <span>{formatRelativeExpiry(link.expiresAt)}</span>
-                  {#if (link.status === GuestLinkStatus.Active || link.status === GuestLinkStatus.Revoked) && link.activatedAt}
-                    <span>Accessed {formatDate(link.activatedAt)}{link.activatedIp ? ` from ${maskIp(link.activatedIp)}` : ""}</span>
-                  {/if}
-                </div>
-              </div>
-              {#if canRevoke(link)}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="text-destructive hover:text-destructive shrink-0"
-                  disabled={revokingId === link.id}
-                  onclick={() => handleRevoke(link.id!)}
-                >
-                  {#if revokingId === link.id}
-                    <Loader2 class="mr-1 h-3.5 w-3.5 animate-spin" />
-                  {:else}
+                {#if canRevoke(link)}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="text-destructive hover:text-destructive shrink-0"
+                    onclick={() => handleRevoke(link.id!)}
+                  >
                     <X class="mr-1 h-3.5 w-3.5" />
-                  {/if}
-                  Revoke
-                </Button>
-              {:else if isTerminal(link) && !link.dismissedAt}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="text-muted-foreground hover:text-foreground shrink-0"
-                  disabled={dismissingId === link.id}
-                  onclick={() => handleDismiss(link.id!)}
-                >
-                  {#if dismissingId === link.id}
-                    <Loader2 class="mr-1 h-3.5 w-3.5 animate-spin" />
-                  {:else}
+                    Revoke
+                  </Button>
+                {:else if isTerminal(link) && !link.dismissedAt}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="text-muted-foreground hover:text-foreground shrink-0"
+                    onclick={() => handleDismiss(link.id!)}
+                  >
                     <EyeOff class="mr-1 h-3.5 w-3.5" />
-                  {/if}
-                  Dismiss
-                </Button>
-              {/if}
-            </Card.Content>
-          </Card.Root>
+                    Dismiss
+                  </Button>
+                {/if}
+              </Card.Content>
+            </Card.Root>
+          </div>
         {/each}
       </div>
       {#if dismissedCount > 0}
@@ -450,7 +454,8 @@
           class="text-xs text-muted-foreground hover:text-foreground transition-colors"
           onclick={() => (showDismissed = !showDismissed)}
         >
-          {showDismissed ? 'Hide' : 'Show'} {dismissedCount} dismissed
+          {showDismissed ? "Hide" : "Show"}
+          {dismissedCount} dismissed
         </button>
       {/if}
     {/if}

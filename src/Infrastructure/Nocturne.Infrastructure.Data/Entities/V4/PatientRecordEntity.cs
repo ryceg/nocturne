@@ -10,7 +10,7 @@ namespace Nocturne.Infrastructure.Data.Entities.V4;
 /// Maps to Nocturne.Core.Models.V4.PatientRecord
 /// </summary>
 [Table("patient_records")]
-public class PatientRecordEntity : ITenantScoped
+public class PatientRecordEntity : ITenantScoped, ISoftDeletable
 {
     /// <summary>
     /// The unique identifier of the tenant this record belongs to.
@@ -72,6 +72,17 @@ public class PatientRecordEntity : ITenantScoped
     public string? AvatarUrl { get; set; }
 
     /// <summary>
+    /// IANA timezone id (e.g. "Australia/Sydney"). Canonical source of patient timezone,
+    /// replacing the deprecated per-profile <c>therapy_settings.timezone</c>. Drives
+    /// wall-clock interpretation in alerts (time-of-day windows, DND, glucose-bucket
+    /// schedule lookup) and analytics. Null until the patient sets it; readers must
+    /// fall back gracefully.
+    /// </summary>
+    [Column("timezone")]
+    [MaxLength(64)]
+    public string? Timezone { get; set; }
+
+    /// <summary>
     /// System tracking: when record was inserted
     /// </summary>
     [Column("sys_created_at")]
@@ -82,4 +93,11 @@ public class PatientRecordEntity : ITenantScoped
     /// </summary>
     [Column("sys_updated_at")]
     public DateTime SysUpdatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Soft-delete timestamp. When non-null the record is treated as deleted
+    /// by the global query filter and is invisible above the repository layer.
+    /// </summary>
+    [Column("deleted_at")]
+    public DateTime? DeletedAt { get; set; }
 }

@@ -22,6 +22,7 @@ namespace Nocturne.API.Controllers.V4.Identity;
 [Tags("Identity")]
 [Route("api/v4/member-invites")]
 [Produces("application/json")]
+[Authorize]
 public class MemberInviteController : ControllerBase
 {
     private readonly IMemberInviteService _memberInviteService;
@@ -148,7 +149,7 @@ public class MemberInviteController : ControllerBase
         var member = await _dbContext.TenantMembers
             .Include(m => m.MemberRoles)
             .Include(m => m.Subject)
-            .Where(m => m.Id == id && m.TenantId == tenantId && m.RevokedAt == null)
+            .Where(m => m.Id == id && m.TenantId == tenantId)
             .FirstOrDefaultAsync(ct);
 
         if (member == null)
@@ -212,7 +213,7 @@ public class MemberInviteController : ControllerBase
         var member = await _dbContext.TenantMembers
             .Include(m => m.MemberRoles)
             .Include(m => m.Subject)
-            .Where(m => m.Id == id && m.TenantId == tenantId && m.RevokedAt == null)
+            .Where(m => m.Id == id && m.TenantId == tenantId)
             .FirstOrDefaultAsync(ct);
 
         if (member == null)
@@ -246,7 +247,7 @@ public class MemberInviteController : ControllerBase
 
         var tenantId = _tenantAccessor.TenantId;
         var member = await _dbContext.TenantMembers
-            .Where(m => m.Id == id && m.TenantId == tenantId && m.RevokedAt == null)
+            .Where(m => m.Id == id && m.TenantId == tenantId)
             .FirstOrDefaultAsync(ct);
 
         if (member == null)
@@ -276,7 +277,7 @@ public class MemberInviteController : ControllerBase
         var tenantId = _tenantAccessor.TenantId;
         var member = await _dbContext.TenantMembers
             .Include(m => m.Subject)
-            .Where(m => m.Id == id && m.TenantId == tenantId && m.RevokedAt == null)
+            .Where(m => m.Id == id && m.TenantId == tenantId)
             .FirstOrDefaultAsync(ct);
 
         if (member == null)

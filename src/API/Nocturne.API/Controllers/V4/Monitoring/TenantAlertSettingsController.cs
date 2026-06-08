@@ -2,16 +2,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenApi.Remote.Attributes;
-using Nocturne.Core.Contracts.Multitenancy;
 using Nocturne.Infrastructure.Data;
 using Nocturne.Infrastructure.Data.Entities;
+using Nocturne.Infrastructure.Data.Services;
 
 namespace Nocturne.API.Controllers.V4.Monitoring;
 
 /// <summary>
 /// Tenant-level alert configuration: Do Not Disturb (manual toggle with optional
-/// auto-expire and a recurring scheduled window) and the IANA timezone the schedule
-/// is interpreted in. The row is created lazily on first access.
+/// auto-expire and a recurring scheduled window). The schedule is interpreted in the
+/// patient's timezone (<see cref="V4.PatientRecord.Timezone"/>) — set there, not here.
+/// The row is created lazily on first access.
 /// </summary>
 /// <remarks>
 /// DND has two activation paths that share the same allowlist semantics — the
@@ -25,15 +26,11 @@ namespace Nocturne.API.Controllers.V4.Monitoring;
 [Tags("Monitoring")]
 public class TenantAlertSettingsController : ControllerBase
 {
-    private readonly IDbContextFactory<NocturneDbContext> _contextFactory;
-    private readonly ITenantAccessor _tenantAccessor;
+    private readonly ITenantDbContextFactory _contextFactory;
 
-    public TenantAlertSettingsController(
-        IDbContextFactory<NocturneDbContext> contextFactory,
-        ITenantAccessor tenantAccessor)
+    public TenantAlertSettingsController(ITenantDbContextFactory contextFactory)
     {
         _contextFactory = contextFactory;
-        _tenantAccessor = tenantAccessor;
     }
 
     /// <summary>
@@ -44,8 +41,7 @@ public class TenantAlertSettingsController : ControllerBase
     [ProducesResponseType(typeof(TenantAlertSettingsResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<TenantAlertSettingsResponse>> Get(CancellationToken ct)
     {
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
-        db.TenantId = _tenantAccessor.TenantId;
+        await using var db = await _contextFactory.CreateAsync(ct);
 
         var entity = await db.TenantAlertSettings.FirstOrDefaultAsync(ct);
         if (entity is null)
@@ -68,8 +64,7 @@ public class TenantAlertSettingsController : ControllerBase
     public async Task<ActionResult<TenantAlertSettingsResponse>> Update(
         [FromBody] UpdateTenantAlertSettingsRequest request, CancellationToken ct)
     {
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
-        db.TenantId = _tenantAccessor.TenantId;
+        await using var db = await _contextFactory.CreateAsync(ct);
 
         var entity = await db.TenantAlertSettings.FirstOrDefaultAsync(ct);
         var isNew = entity is null;
@@ -91,7 +86,6 @@ public class TenantAlertSettingsController : ControllerBase
         entity.DndScheduleEnabled = request.DndScheduleEnabled;
         entity.DndScheduleStart = request.DndScheduleStart;
         entity.DndScheduleEnd = request.DndScheduleEnd;
-        entity.Timezone = string.IsNullOrWhiteSpace(request.Timezone) ? "UTC" : request.Timezone;
         entity.UpdatedAt = DateTime.UtcNow;
 
         if (isNew) db.TenantAlertSettings.Add(entity);
@@ -108,7 +102,6 @@ public class TenantAlertSettingsController : ControllerBase
         DndScheduleEnabled = e.DndScheduleEnabled,
         DndScheduleStart = e.DndScheduleStart,
         DndScheduleEnd = e.DndScheduleEnd,
-        Timezone = e.Timezone,
     };
 }
 
@@ -129,14 +122,11 @@ public class TenantAlertSettingsResponse
     /// <summary>True when a recurring scheduled DND window is configured.</summary>
     public bool DndScheduleEnabled { get; set; }
 
-    /// <summary>Local-time start of the scheduled DND window (in <see cref="Timezone"/>).</summary>
+    /// <summary>Local-time start of the scheduled DND window, interpreted in the patient's timezone.</summary>
     public TimeOnly? DndScheduleStart { get; set; }
 
     /// <summary>Local-time end of the scheduled DND window. Cross-midnight windows allowed.</summary>
     public TimeOnly? DndScheduleEnd { get; set; }
-
-    /// <summary>IANA timezone (e.g. <c>Europe/London</c>) for the scheduled window.</summary>
-    public string Timezone { get; set; } = "UTC";
 }
 
 public class UpdateTenantAlertSettingsRequest
@@ -146,7 +136,6 @@ public class UpdateTenantAlertSettingsRequest
     public bool DndScheduleEnabled { get; set; }
     public TimeOnly? DndScheduleStart { get; set; }
     public TimeOnly? DndScheduleEnd { get; set; }
-    public string Timezone { get; set; } = "UTC";
 }
 
 #endregion

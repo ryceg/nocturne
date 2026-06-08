@@ -40,6 +40,7 @@
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="ShiroTrie" />
     <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="SocketIOClient" />
     <PackageReference Include="Wasmtime" />
     <PackageReference Include="YamlDotNet" />
     <PackageReference Include="Yarp.ReverseProxy" />
@@ -65,6 +66,8 @@
     <ProjectReference Include="..\..\Infrastructure\Nocturne.Infrastructure.Shared\Nocturne.Infrastructure.Shared.csproj" />
     <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.Core\Nocturne.Connectors.Core.csproj" />
     <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.Dexcom\Nocturne.Connectors.Dexcom.csproj" />
+    <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.Eversense\Nocturne.Connectors.Eversense.csproj" />
+    <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.Gluroo\Nocturne.Connectors.Gluroo.csproj" />
     <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.Glooko\Nocturne.Connectors.Glooko.csproj" />
     <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.FreeStyle\Nocturne.Connectors.FreeStyle.csproj" />
     <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.MyLife\Nocturne.Connectors.MyLife.csproj" />
@@ -73,6 +76,8 @@
     <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.Nightscout\Nocturne.Connectors.Nightscout.csproj" />
     <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.HomeAssistant\Nocturne.Connectors.HomeAssistant.csproj" />
     <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.NocturneRemote\Nocturne.Connectors.NocturneRemote.csproj" />
+    <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.Twiist\Nocturne.Connectors.Twiist.csproj" />
+    <ProjectReference Include="..\..\Connectors\Nocturne.Connectors.CareLink\Nocturne.Connectors.CareLink.csproj" />
   </ItemGroup>
   <!-- Diagram sources — published to wwwroot/diagrams/ so the OpenAPI document
        transformers can find them in Docker (where the source tree isn't available). -->
@@ -81,13 +86,17 @@
     <Content Include="@(DiagramSource)" Link="wwwroot\diagrams\%(Filename)%(Extension)" CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- NSwag TypeScript Client Generation -->
-  <!-- Runs automatically after build in development mode -->
-  <!-- Set GenerateNSwagClient=false to skip (e.g., in CI/CD or publish scenarios) -->
-  <!-- Manual: dotnet build -t:GenerateClient or dotnet build -p:GenerateNSwagClient=true -->
+  <!-- Runs on `dotnet build` and on initial Aspire startup (first build before watch loop). -->
+  <!-- Skipped on subsequent `dotnet watch` rebuilds (DOTNET_WATCH_ITERATION is set from -->
+  <!-- rebuild #1 onwards) so backend hot-loop iteration doesn't trigger TS regeneration. -->
+  <!-- Force regen during watch: dotnet build -p:GenerateNSwagClient=true -->
   <PropertyGroup>
+    <_GenerateNSwagClientExplicit>$(GenerateNSwagClient)</_GenerateNSwagClientExplicit>
     <GenerateNSwagClient Condition="'$(GenerateNSwagClient)' == ''">true</GenerateNSwagClient>
-    <!-- Skip NSwag generation during publish to avoid issues with runtime dependencies -->
-    <GenerateNSwagClient Condition="'$(PublishDir)' != ''">false</GenerateNSwagClient>
+    <!-- Skip during dotnet watch rebuilds unless explicitly overridden -->
+    <GenerateNSwagClient Condition="'$(_GenerateNSwagClientExplicit)' == '' And '$(DOTNET_WATCH_ITERATION)' != ''">false</GenerateNSwagClient>
+    <!-- Skip during publish to avoid issues with runtime dependencies -->
+    <GenerateNSwagClient Condition="'$(_GenerateNSwagClientExplicit)' == '' And '$(PublishDir)' != ''">false</GenerateNSwagClient>
   </PropertyGroup>
   <Target Name="GenerateClient" AfterTargets="PostBuildEvent" Condition="'$(GenerateNSwagClient)' == 'true'">
     <Message Importance="high" Text="Generating TypeScript API client with NSwag..." />

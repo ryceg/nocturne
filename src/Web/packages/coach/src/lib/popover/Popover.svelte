@@ -18,9 +18,27 @@
   let dwellTimer: ReturnType<typeof setTimeout> | null = null;
   let cleanupAutoUpdate: (() => void) | null = null;
 
+  let { navigationFlag = { navigating: false } }: { navigationFlag?: { navigating: boolean } } = $props();
+
+  let historyEntryPushed = false;
+  let dismissedByUI = false;
+
   const SPOTLIGHT_PADDING = 8;
 
   let spotlightClipPath = $state("");
+
+  // Mobile renders the popover as a bottom sheet anchored by CSS. Track the
+  // breakpoint so we can suppress floating-ui's inline positioning there.
+  let isMobile = $state(false);
+
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    isMobile = mq.matches;
+    const onChange = (e: MediaQueryListEvent) => (isMobile = e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  });
 
   const activeKey = $derived(ctx.activeKey);
   const mountedSteps = $derived(activeKey ? ctx.getMountedSteps(activeKey) : []);
@@ -34,6 +52,63 @@
       startDwellTimer();
     } else {
       cancelDwellTimer();
+    }
+  });
+
+  // History management for back-button dismissal.
+  // Push a sentinel entry when the overlay appears; pop it when it disappears.
+  $effect(() => {
+    const key = activeKey;
+
+    if (key) {
+      // Overlay just appeared — push sentinel if we haven't already
+      if (!historyEntryPushed) {
+        dismissedByUI = false; // reset stale flag from any previous cycle
+        history.pushState({ ...history.state, __coachMark: true }, "");
+        historyEntryPushed = true;
+      }
+
+      function onPopState() {
+        // Guard: if the UI already dismissed (Escape/backdrop/button),
+        // this popstate is just the history.back() cleanup — ignore it.
+        if (dismissedByUI) {
+          dismissedByUI = false;
+          return;
+        }
+
+        // The user pressed back. Dismiss with quiet so no follow-on sequence appears.
+        historyEntryPushed = false;
+        if (key) ctx.dismiss(key, { quiet: true });
+      }
+
+      window.addEventListener("popstate", onPopState);
+
+      return () => {
+        window.removeEventListener("popstate", onPopState);
+
+        // If transitioning directly to another coach mark (activeKey went
+        // from truthy A to truthy B), keep the sentinel entry — the new
+        // effect run will reuse it via the historyEntryPushed guard.
+        if (ctx.activeKey) return;
+
+        // Cleanup: overlay is disappearing, remove the sentinel entry.
+        if (historyEntryPushed) {
+          historyEntryPushed = false;
+          if (navigationFlag.navigating) {
+            // SvelteKit is navigating — don't call history.back() which
+            // would fight the router. Replace the current state to strip
+            // our marker (the router's pushState has already happened).
+            navigationFlag.navigating = false;
+            const cleaned = { ...history.state };
+            delete cleaned.__coachMark;
+            history.replaceState(cleaned, "");
+          } else {
+            // Natural dismiss (Escape, backdrop, "Got it") — pop our entry.
+            dismissedByUI = true;
+            history.back();
+          }
+        }
+      };
     }
   });
 
@@ -73,16 +148,30 @@
     }
   }
 
-  // Position popover
+  // Position popover — scroll the popover tooltip into view, not the target element.
+  // For large target elements, scrollIntoView on the element itself can push the
+  // tooltip off-screen because the browser centers the (potentially huge) element.
   $effect(() => {
     if (currentRegistration && popoverEl) {
-      currentRegistration.element.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Initial scroll: use "nearest" so the browser only scrolls if the element
+      // is fully off-screen, avoiding jarring jumps for large elements.
+      currentRegistration.element.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
       cleanupAutoUpdate?.();
+      let initialPosition = true;
       cleanupAutoUpdate = autoUpdate(currentRegistration.element, popoverEl, () => {
         if (!currentRegistration || !popoverEl) return;
 
         updateSpotlightRect(currentRegistration.element);
+
+        // On mobile the popover is a bottom sheet positioned entirely by CSS.
+        // Applying floating-ui's inline top/left would override the CSS top:auto
+        // and fight bottom:0, stretching the sheet to fill the viewport.
+        if (isMobile) {
+          popoverEl.style.left = "";
+          popoverEl.style.top = "";
+          return;
+        }
 
         computePosition(currentRegistration.element, popoverEl, {
           strategy: "fixed",
@@ -101,6 +190,14 @@
               left: middlewareData.arrow.x != null ? `${middlewareData.arrow.x}px` : "",
               top: middlewareData.arrow.y != null ? `${middlewareData.arrow.y}px` : "",
             });
+          }
+
+          // After the first position computation, scroll the popover itself into
+          // view so the user can always see the tooltip — even when the target
+          // element is taller than the viewport.
+          if (initialPosition) {
+            initialPosition = false;
+            popoverEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
           }
         });
       });

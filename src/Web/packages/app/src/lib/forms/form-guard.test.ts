@@ -32,7 +32,7 @@ function createMockForm() {
       enhanceCallback = cb;
       return { action: "/mock", method: "POST" };
     },
-    for(key: string) {
+    for(_key: string) {
       return this;
     },
     async _triggerEnhance() {
@@ -219,7 +219,7 @@ describe("FormGuard", () => {
 
   describe("navigation blocking", () => {
     it("registers beforeNavigate when navBlockMessage is provided", () => {
-      const guard = new FormGuard({
+      new FormGuard({
         form: createMockForm(),
         schema,
         el: () => null,
@@ -232,7 +232,7 @@ describe("FormGuard", () => {
     });
 
     it("does not register beforeNavigate when no navBlockMessage", () => {
-      const guard = new FormGuard({
+      new FormGuard({
         form: createMockForm(),
         schema,
         el: () => null,
@@ -257,7 +257,7 @@ describe("FormGuard", () => {
       // touched is set by $effect when dirty, but $effect doesn't run in
       // Node vitest. We work around this by creating a guard that will be
       // dirty, then manually triggering touched via reset-then-validate flow.
-      const guard = new FormGuard({
+      new FormGuard({
         form: createMockForm(),
         schema,
         el: () => null,

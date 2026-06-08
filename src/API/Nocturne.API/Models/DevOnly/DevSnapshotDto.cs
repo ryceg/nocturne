@@ -75,8 +75,6 @@ public class TenantEntityDto
     public string DisplayName { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public DateTime? LastReadingAt { get; set; }
-    public string Timezone { get; set; } = "UTC";
-    public string? SubjectName { get; set; }
     public bool AllowAccessRequests { get; set; }
     public DateTime SysCreatedAt { get; set; }
     public DateTime SysUpdatedAt { get; set; }

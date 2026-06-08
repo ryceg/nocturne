@@ -1037,6 +1037,420 @@ export class SetupClient {
     }
 }
 
+export class BasalInjectionClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * Creates a new record and returns it with a `Location` header pointing to the created resource.
+     * @param request The data used to create the record.
+     */
+    create(request: CreateBasalInjectionRequest, signal?: AbortSignal): Promise<BasalInjection> {
+        let url_ = this.baseUrl + "/api/v4/insulin/basal-injections";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCreate(_response);
+        });
+    }
+
+    protected processCreate(response: Response): Promise<BasalInjection> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 201) {
+            return response.text().then((_responseText) => {
+            let result201: any = null;
+            result201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BasalInjection;
+            return result201;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BasalInjection>(null as any);
+    }
+
+    /**
+     * Lists records with pagination, optional date range, device, and source filtering.
+     * @param from (optional) Inclusive start of the date range filter.
+     * @param to (optional) Inclusive end of the date range filter.
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     * @param sort (optional) Sort order for results by timestamp. Defaults to `timestamp_desc`.
+     * @param device (optional) Optional filter to restrict results to a specific device.
+     * @param source (optional) Optional filter to restrict results to a specific data source.
+     */
+    getAll(from?: Date | null | undefined, to?: Date | null | undefined, limit?: number | undefined, offset?: number | undefined, sort?: string | undefined, device?: string | null | undefined, source?: string | null | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfBasalInjection> {
+        let url_ = this.baseUrl + "/api/v4/insulin/basal-injections?";
+        if (from !== undefined && from !== null)
+            url_ += "from=" + encodeURIComponent(from ? "" + from.toISOString() : "") + "&";
+        if (to !== undefined && to !== null)
+            url_ += "to=" + encodeURIComponent(to ? "" + to.toISOString() : "") + "&";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        if (sort === null)
+            throw new globalThis.Error("The parameter 'sort' cannot be null.");
+        else if (sort !== undefined)
+            url_ += "sort=" + encodeURIComponent("" + sort) + "&";
+        if (device !== undefined && device !== null)
+            url_ += "device=" + encodeURIComponent("" + device) + "&";
+        if (source !== undefined && source !== null)
+            url_ += "source=" + encodeURIComponent("" + source) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetAll(_response);
+        });
+    }
+
+    protected processGetAll(response: Response): Promise<PaginatedResponseOfBasalInjection> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfBasalInjection;
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfBasalInjection>(null as any);
+    }
+
+    /**
+     * Updates an existing record by ID and returns the updated record.
+     * @param id The unique identifier of the record to update.
+     * @param request The data to apply to the existing record.
+     */
+    update(id: string, request: UpdateBasalInjectionRequest, signal?: AbortSignal): Promise<BasalInjection> {
+        let url_ = this.baseUrl + "/api/v4/insulin/basal-injections/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdate(_response);
+        });
+    }
+
+    protected processUpdate(response: Response): Promise<BasalInjection> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BasalInjection;
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BasalInjection>(null as any);
+    }
+
+    /**
+     * Deletes a record by ID.
+     * @param id The unique identifier of the record to delete.
+     */
+    delete(id: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/insulin/basal-injections/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDelete(_response);
+        });
+    }
+
+    protected processDelete(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Retrieves a single record by its unique identifier.
+     * @param id The unique identifier of the record.
+     */
+    getById(id: string, signal?: AbortSignal): Promise<BasalInjection> {
+        let url_ = this.baseUrl + "/api/v4/insulin/basal-injections/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetById(_response);
+        });
+    }
+
+    protected processGetById(response: Response): Promise<BasalInjection> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BasalInjection;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BasalInjection>(null as any);
+    }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfBasalInjection> {
+        let url_ = this.baseUrl + "/api/v4/insulin/basal-injections/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfBasalInjection> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfBasalInjection;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfBasalInjection>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<BasalInjection> {
+        let url_ = this.baseUrl + "/api/v4/insulin/basal-injections/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<BasalInjection> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BasalInjection;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BasalInjection>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<BasalInjection[]> {
+        let url_ = this.baseUrl + "/api/v4/insulin/basal-injections/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<BasalInjection[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BasalInjection[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BasalInjection[]>(null as any);
+    }
+}
+
 export class BolusCalculationClient {
     private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
     private baseUrl: string;
@@ -1312,6 +1726,142 @@ export class BolusCalculationClient {
             });
         }
         return Promise.resolve<BolusCalculation>(null as any);
+    }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfBolusCalculation> {
+        let url_ = this.baseUrl + "/api/v4/insulin/calculations/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfBolusCalculation> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfBolusCalculation;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfBolusCalculation>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<BolusCalculation> {
+        let url_ = this.baseUrl + "/api/v4/insulin/calculations/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<BolusCalculation> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BolusCalculation;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BolusCalculation>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<BolusCalculation[]> {
+        let url_ = this.baseUrl + "/api/v4/insulin/calculations/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<BolusCalculation[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BolusCalculation[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BolusCalculation[]>(null as any);
     }
 }
 
@@ -1636,6 +2186,142 @@ export class BolusClient {
             });
         }
         return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfBolus> {
+        let url_ = this.baseUrl + "/api/v4/insulin/boluses/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfBolus> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfBolus;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfBolus>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<Bolus> {
+        let url_ = this.baseUrl + "/api/v4/insulin/boluses/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<Bolus> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Bolus;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Bolus>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<Bolus[]> {
+        let url_ = this.baseUrl + "/api/v4/insulin/boluses/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<Bolus[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Bolus[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Bolus[]>(null as any);
     }
 }
 
@@ -2675,6 +3361,142 @@ export class NoteClient {
             });
         }
         return Promise.resolve<Note>(null as any);
+    }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfNote> {
+        let url_ = this.baseUrl + "/api/v4/observations/notes/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfNote> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfNote;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfNote>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<Note> {
+        let url_ = this.baseUrl + "/api/v4/observations/notes/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<Note> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Note;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Note>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<Note[]> {
+        let url_ = this.baseUrl + "/api/v4/observations/notes/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<Note[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Note[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Note[]>(null as any);
     }
 }
 
@@ -5748,6 +6570,49 @@ export class ProfileClient {
     }
 
     /**
+     * Set a profile as the active (default) profile. Clears IsDefault on all other profiles.
+     */
+    setDefaultProfile(profileName: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/profile/set-default/{profileName}";
+        if (profileName === undefined || profileName === null)
+            throw new globalThis.Error("The parameter 'profileName' must be defined.");
+        url_ = url_.replace("{profileName}", encodeURIComponent("" + profileName));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processSetDefaultProfile(_response);
+        });
+    }
+
+    protected processSetDefaultProfile(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
      * Get legacy Nightscout-shaped profile records projected from V4 schedule data.
     Intended for connector consumption where the caller needs the monolithic
     Profile shape (store with basal/carbratio/sens/target arrays).
@@ -7546,6 +8411,1301 @@ export class UserPreferencesClient {
     }
 }
 
+export class AccessRequestClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    getPendingRequests(signal?: AbortSignal): Promise<AccessRequestDto[]> {
+        let url_ = this.baseUrl + "/api/v4/admin/access-requests";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPendingRequests(_response);
+        });
+    }
+
+    protected processGetPendingRequests(response: Response): Promise<AccessRequestDto[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as AccessRequestDto[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<AccessRequestDto[]>(null as any);
+    }
+
+    approve(subjectId: string, request: ApproveAccessRequestRequest, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/access-requests/{subjectId}/approve";
+        if (subjectId === undefined || subjectId === null)
+            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
+        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processApprove(_response);
+        });
+    }
+
+    protected processApprove(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    deny(subjectId: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/access-requests/{subjectId}/deny";
+        if (subjectId === undefined || subjectId === null)
+            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
+        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDeny(_response);
+        });
+    }
+
+    protected processDeny(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+}
+
+export class ConnectorAdminClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * List the connectors a target tenant has configured, with their last-sync and health state.
+     * @param tenantId The target tenant.
+     */
+    getTenantConnectors(tenantId: string, signal?: AbortSignal): Promise<TenantConnectorsDto> {
+        let url_ = this.baseUrl + "/api/v4/admin/connectors/{tenantId}";
+        if (tenantId === undefined || tenantId === null)
+            throw new globalThis.Error("The parameter 'tenantId' must be defined.");
+        url_ = url_.replace("{tenantId}", encodeURIComponent("" + tenantId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetTenantConnectors(_response);
+        });
+    }
+
+    protected processGetTenantConnectors(response: Response): Promise<TenantConnectorsDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantConnectorsDto;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<TenantConnectorsDto>(null as any);
+    }
+
+    /**
+     * Enqueue a background reset of the sync cursor for every connector configured on a target
+    tenant, forcing a re-pull of history. Use after fixing a connector bug to push corrected data
+    to an affected tenant.
+     * @param tenantId The target tenant whose connectors should be re-pulled.
+     * @param request Optional lower bound and data-type filter, mirroring the per-tenant reset endpoint.
+     */
+    resetTenantCursors(tenantId: string, request: AdminResetCursorsRequest, signal?: AbortSignal): Promise<ConnectorResetJobInfo> {
+        let url_ = this.baseUrl + "/api/v4/admin/connectors/{tenantId}/reset-cursors";
+        if (tenantId === undefined || tenantId === null)
+            throw new globalThis.Error("The parameter 'tenantId' must be defined.");
+        url_ = url_.replace("{tenantId}", encodeURIComponent("" + tenantId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processResetTenantCursors(_response);
+        });
+    }
+
+    protected processResetTenantCursors(response: Response): Promise<ConnectorResetJobInfo> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 202) {
+            return response.text().then((_responseText) => {
+            let result202: any = null;
+            result202 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ConnectorResetJobInfo;
+            return result202;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ConnectorResetJobInfo>(null as any);
+    }
+
+    /**
+     * Get the progress of a connector cursor reset job, including per-connector outcomes as they land.
+     * @param jobId The job id returned by ResetTenantCursors.
+     */
+    getResetJobStatus(jobId: string, signal?: AbortSignal): Promise<ConnectorResetJobStatus> {
+        let url_ = this.baseUrl + "/api/v4/admin/connectors/jobs/{jobId}";
+        if (jobId === undefined || jobId === null)
+            throw new globalThis.Error("The parameter 'jobId' must be defined.");
+        url_ = url_.replace("{jobId}", encodeURIComponent("" + jobId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetResetJobStatus(_response);
+        });
+    }
+
+    protected processGetResetJobStatus(response: Response): Promise<ConnectorResetJobStatus> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ConnectorResetJobStatus;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ConnectorResetJobStatus>(null as any);
+    }
+
+    /**
+     * Request cancellation of a running connector cursor reset job. Connectors already re-pulled
+    keep their committed data; the fan-out simply stops before the next connector.
+     * @param jobId The job id to cancel.
+     */
+    cancelResetJob(jobId: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/connectors/jobs/{jobId}/cancel";
+        if (jobId === undefined || jobId === null)
+            throw new globalThis.Error("The parameter 'jobId' must be defined.");
+        url_ = url_.replace("{jobId}", encodeURIComponent("" + jobId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCancelResetJob(_response);
+        });
+    }
+
+    protected processCancelResetJob(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+}
+
+export class PlatformAccessClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * Mint a platform-access grant for the given tenant slug and redirect the operator into the
+    tenant. Bounces through OIDC login if there is no session yet; 403s if the session is not a
+    platform admin.
+     * @param tenant (optional) Target tenant slug.
+     */
+    access(tenant?: string | null | undefined, signal?: AbortSignal): Promise<FileResponse> {
+        let url_ = this.baseUrl + "/api/auth/platform-access?";
+        if (tenant !== undefined && tenant !== null)
+            url_ += "tenant=" + encodeURIComponent("" + tenant) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/octet-stream"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processAccess(_response);
+        });
+    }
+
+    protected processAccess(response: Response): Promise<FileResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200 || status === 206) {
+            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
+            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
+            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
+            if (fileName) {
+                fileName = decodeURIComponent(fileName);
+            } else {
+                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
+                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
+            }
+            return response.blob().then(blob => { return { fileName: fileName, data: blob, status: status, headers: _headers }; });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<FileResponse>(null as any);
+    }
+}
+
+export class PlatformSettingsClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * Returns all platform setting categories with enabled status and configured field names.
+    Secrets are never returned — only which fields have been set.
+     */
+    getAll(signal?: AbortSignal): Promise<PlatformSettingsSummary[]> {
+        let url_ = this.baseUrl + "/api/v4/admin/platform-settings";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetAll(_response);
+        });
+    }
+
+    protected processGetAll(response: Response): Promise<PlatformSettingsSummary[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlatformSettingsSummary[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PlatformSettingsSummary[]>(null as any);
+    }
+
+    /**
+     * Returns a single platform setting category.
+     */
+    get(category: string, signal?: AbortSignal): Promise<PlatformSettingsSummary> {
+        let url_ = this.baseUrl + "/api/v4/admin/platform-settings/{category}";
+        if (category === undefined || category === null)
+            throw new globalThis.Error("The parameter 'category' must be defined.");
+        url_ = url_.replace("{category}", encodeURIComponent("" + category));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGet(_response);
+        });
+    }
+
+    protected processGet(response: Response): Promise<PlatformSettingsSummary> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlatformSettingsSummary;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PlatformSettingsSummary>(null as any);
+    }
+
+    /**
+     * Upserts platform settings for a category. Blank fields preserve existing values.
+    Returns restartRequired: true — the SvelteKit frontend must be restarted for changes to take effect.
+     */
+    upsert(category: string, request: UpsertPlatformSettingsRequest, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/platform-settings/{category}";
+        if (category === undefined || category === null)
+            throw new globalThis.Error("The parameter 'category' must be defined.");
+        url_ = url_.replace("{category}", encodeURIComponent("" + category));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpsert(_response);
+        });
+    }
+
+    protected processUpsert(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            result422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Deletes platform settings for a category, removing all stored credentials.
+     */
+    delete(category: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/platform-settings/{category}";
+        if (category === undefined || category === null)
+            throw new globalThis.Error("The parameter 'category' must be defined.");
+        url_ = url_.replace("{category}", encodeURIComponent("" + category));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDelete(_response);
+        });
+    }
+
+    protected processDelete(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Returns decrypted credentials for all configured platforms.
+    Restricted to instance-key authentication only (server-to-server).
+     */
+    getAllDecrypted(signal?: AbortSignal): Promise<PlatformCredentials[]> {
+        let url_ = this.baseUrl + "/api/v4/admin/platform-settings/decrypted";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetAllDecrypted(_response);
+        });
+    }
+
+    protected processGetAllDecrypted(response: Response): Promise<PlatformCredentials[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlatformCredentials[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PlatformCredentials[]>(null as any);
+    }
+}
+
+export class TenantClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    getAll(signal?: AbortSignal): Promise<TenantDto[]> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetAll(_response);
+        });
+    }
+
+    protected processGetAll(response: Response): Promise<TenantDto[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantDto[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<TenantDto[]>(null as any);
+    }
+
+    create(request: CreateTenantRequest, signal?: AbortSignal): Promise<TenantCreatedDto> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCreate(_response);
+        });
+    }
+
+    protected processCreate(response: Response): Promise<TenantCreatedDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 201) {
+            return response.text().then((_responseText) => {
+            let result201: any = null;
+            result201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantCreatedDto;
+            return result201;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<TenantCreatedDto>(null as any);
+    }
+
+    getById(id: string, signal?: AbortSignal): Promise<TenantDetailDto> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetById(_response);
+        });
+    }
+
+    protected processGetById(response: Response): Promise<TenantDetailDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantDetailDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<TenantDetailDto>(null as any);
+    }
+
+    update(id: string, request: UpdateTenantRequest, signal?: AbortSignal): Promise<TenantDto> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdate(_response);
+        });
+    }
+
+    protected processUpdate(response: Response): Promise<TenantDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<TenantDto>(null as any);
+    }
+
+    delete(id: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDelete(_response);
+        });
+    }
+
+    protected processDelete(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    addMember(id: string, request: AddMemberRequest, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processAddMember(_response);
+        });
+    }
+
+    protected processAddMember(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    removeMember(id: string, subjectId: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (subjectId === undefined || subjectId === null)
+            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
+        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRemoveMember(_response);
+        });
+    }
+
+    protected processRemoveMember(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    createInvite(id: string, request: CreateMemberInviteRequest, signal?: AbortSignal): Promise<MemberInviteResult> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/invites";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCreateInvite(_response);
+        });
+    }
+
+    protected processCreateInvite(response: Response): Promise<MemberInviteResult> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 201) {
+            return response.text().then((_responseText) => {
+            let result201: any = null;
+            result201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MemberInviteResult;
+            return result201;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<MemberInviteResult>(null as any);
+    }
+
+    listInvites(id: string, signal?: AbortSignal): Promise<MemberInviteInfo[]> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/invites";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListInvites(_response);
+        });
+    }
+
+    protected processListInvites(response: Response): Promise<MemberInviteInfo[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MemberInviteInfo[];
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<MemberInviteInfo[]>(null as any);
+    }
+
+    revokeInvite(id: string, inviteId: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/invites/{inviteId}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (inviteId === undefined || inviteId === null)
+            throw new globalThis.Error("The parameter 'inviteId' must be defined.");
+        url_ = url_.replace("{inviteId}", encodeURIComponent("" + inviteId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRevokeInvite(_response);
+        });
+    }
+
+    protected processRevokeInvite(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    provision(request: ProvisionRequest, signal?: AbortSignal): Promise<ProvisionResult> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/provision";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processProvision(_response);
+        });
+    }
+
+    protected processProvision(response: Response): Promise<ProvisionResult> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 201) {
+            return response.text().then((_responseText) => {
+            let result201: any = null;
+            result201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProvisionResult;
+            return result201;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ProvisionResult>(null as any);
+    }
+
+    /**
+     * Lists passkey credentials and OIDC identities for a member subject.
+     */
+    getMemberCredentials(id: string, subjectId: string, signal?: AbortSignal): Promise<SubjectCredentialsDto> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (subjectId === undefined || subjectId === null)
+            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
+        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetMemberCredentials(_response);
+        });
+    }
+
+    protected processGetMemberCredentials(response: Response): Promise<SubjectCredentialsDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as SubjectCredentialsDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<SubjectCredentialsDto>(null as any);
+    }
+
+    /**
+     * Attaches an OIDC identity to a member subject.
+     */
+    attachOidcIdentity(id: string, subjectId: string, request: AdminAttachOidcRequest, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/oidc";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (subjectId === undefined || subjectId === null)
+            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
+        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processAttachOidcIdentity(_response);
+        });
+    }
+
+    protected processAttachOidcIdentity(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Removes a passkey credential from a member subject.
+     */
+    removePasskeyCredential(id: string, subjectId: string, credentialId: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/passkey/{credentialId}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (subjectId === undefined || subjectId === null)
+            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
+        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
+        if (credentialId === undefined || credentialId === null)
+            throw new globalThis.Error("The parameter 'credentialId' must be defined.");
+        url_ = url_.replace("{credentialId}", encodeURIComponent("" + credentialId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRemovePasskeyCredential(_response);
+        });
+    }
+
+    protected processRemovePasskeyCredential(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Removes an OIDC identity from a member subject.
+     */
+    removeOidcIdentity(id: string, subjectId: string, identityId: string, signal?: AbortSignal): Promise<void> {
+        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/oidc/{identityId}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (subjectId === undefined || subjectId === null)
+            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
+        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
+        if (identityId === undefined || identityId === null)
+            throw new globalThis.Error("The parameter 'identityId' must be defined.");
+        url_ = url_.replace("{identityId}", encodeURIComponent("" + identityId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            signal,
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRemoveOidcIdentity(_response);
+        });
+    }
+
+    protected processRemoveOidcIdentity(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+}
+
 export class CompatibilityClient {
     private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
     private baseUrl: string;
@@ -8678,6 +10838,59 @@ export class ServicesClient {
     }
 
     /**
+     * Reset a connector's sync cursor for the current tenant and re-pull historical data.
+     * @param id Connector ID (e.g., "nightscout", "dexcom").
+     * @param request Optional lower bound and data-type filter. Omit from to re-pull all available history; omit dataTypes to reset every supported type.
+     * @return Sync result with success status and details.
+     */
+    resetConnectorCursor(id: string, request: ResetCursorRequest, signal?: AbortSignal): Promise<SyncResult> {
+        let url_ = this.baseUrl + "/api/v4/services/connectors/{id}/reset-cursor";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processResetConnectorCursor(_response);
+        });
+    }
+
+    protected processResetConnectorCursor(response: Response): Promise<SyncResult> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as SyncResult;
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<SyncResult>(null as any);
+    }
+
+    /**
      * Get sync status for a specific connector, including latest timestamps and connector state.
     Used by connectors on startup to determine where to resume syncing from.
      * @param id The connector ID (e.g., "dexcom", "libre", "glooko")
@@ -9262,815 +11475,6 @@ export class SystemEventsClient {
             });
         }
         return Promise.resolve<FileResponse>(null as any);
-    }
-}
-
-export class AccessRequestClient {
-    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
-    private baseUrl: string;
-    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
-
-    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
-        this.http = http ? http : window as any;
-        this.baseUrl = baseUrl ?? "";
-    }
-
-    getPendingRequests(signal?: AbortSignal): Promise<AccessRequestDto[]> {
-        let url_ = this.baseUrl + "/api/v4/admin/access-requests";
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            signal,
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGetPendingRequests(_response);
-        });
-    }
-
-    protected processGetPendingRequests(response: Response): Promise<AccessRequestDto[]> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as AccessRequestDto[];
-            return result200;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<AccessRequestDto[]>(null as any);
-    }
-
-    approve(subjectId: string, request: ApproveAccessRequestRequest, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/access-requests/{subjectId}/approve";
-        if (subjectId === undefined || subjectId === null)
-            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
-        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            signal,
-            headers: {
-                "Content-Type": "application/json",
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processApprove(_response);
-        });
-    }
-
-    protected processApprove(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 404) {
-            return response.text().then((_responseText) => {
-            let result404: any = null;
-            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    deny(subjectId: string, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/access-requests/{subjectId}/deny";
-        if (subjectId === undefined || subjectId === null)
-            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
-        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "POST",
-            signal,
-            headers: {
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processDeny(_response);
-        });
-    }
-
-    protected processDeny(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 404) {
-            return response.text().then((_responseText) => {
-            let result404: any = null;
-            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-}
-
-export class TenantClient {
-    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
-    private baseUrl: string;
-    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
-
-    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
-        this.http = http ? http : window as any;
-        this.baseUrl = baseUrl ?? "";
-    }
-
-    getAll(signal?: AbortSignal): Promise<TenantDto[]> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants";
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            signal,
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGetAll(_response);
-        });
-    }
-
-    protected processGetAll(response: Response): Promise<TenantDto[]> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantDto[];
-            return result200;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<TenantDto[]>(null as any);
-    }
-
-    create(request: CreateTenantRequest, signal?: AbortSignal): Promise<TenantCreatedDto> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            signal,
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processCreate(_response);
-        });
-    }
-
-    protected processCreate(response: Response): Promise<TenantCreatedDto> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 201) {
-            return response.text().then((_responseText) => {
-            let result201: any = null;
-            result201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantCreatedDto;
-            return result201;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<TenantCreatedDto>(null as any);
-    }
-
-    getById(id: string, signal?: AbortSignal): Promise<TenantDetailDto> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            signal,
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGetById(_response);
-        });
-    }
-
-    protected processGetById(response: Response): Promise<TenantDetailDto> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantDetailDto;
-            return result200;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<TenantDetailDto>(null as any);
-    }
-
-    update(id: string, request: UpdateTenantRequest, signal?: AbortSignal): Promise<TenantDto> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "PUT",
-            signal,
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processUpdate(_response);
-        });
-    }
-
-    protected processUpdate(response: Response): Promise<TenantDto> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TenantDto;
-            return result200;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<TenantDto>(null as any);
-    }
-
-    delete(id: string, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "DELETE",
-            signal,
-            headers: {
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processDelete(_response);
-        });
-    }
-
-    protected processDelete(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 204) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 404) {
-            return response.text().then((_responseText) => {
-            let result404: any = null;
-            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    addMember(id: string, request: AddMemberRequest, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            signal,
-            headers: {
-                "Content-Type": "application/json",
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processAddMember(_response);
-        });
-    }
-
-    protected processAddMember(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 204) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    removeMember(id: string, subjectId: string, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        if (subjectId === undefined || subjectId === null)
-            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
-        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "DELETE",
-            signal,
-            headers: {
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processRemoveMember(_response);
-        });
-    }
-
-    protected processRemoveMember(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 204) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    createInvite(id: string, request: CreateMemberInviteRequest, signal?: AbortSignal): Promise<MemberInviteResult> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/invites";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            signal,
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processCreateInvite(_response);
-        });
-    }
-
-    protected processCreateInvite(response: Response): Promise<MemberInviteResult> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 201) {
-            return response.text().then((_responseText) => {
-            let result201: any = null;
-            result201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MemberInviteResult;
-            return result201;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<MemberInviteResult>(null as any);
-    }
-
-    listInvites(id: string, signal?: AbortSignal): Promise<MemberInviteInfo[]> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/invites";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            signal,
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processListInvites(_response);
-        });
-    }
-
-    protected processListInvites(response: Response): Promise<MemberInviteInfo[]> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MemberInviteInfo[];
-            return result200;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<MemberInviteInfo[]>(null as any);
-    }
-
-    revokeInvite(id: string, inviteId: string, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/invites/{inviteId}";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        if (inviteId === undefined || inviteId === null)
-            throw new globalThis.Error("The parameter 'inviteId' must be defined.");
-        url_ = url_.replace("{inviteId}", encodeURIComponent("" + inviteId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "DELETE",
-            signal,
-            headers: {
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processRevokeInvite(_response);
-        });
-    }
-
-    protected processRevokeInvite(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 204) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status === 404) {
-            return response.text().then((_responseText) => {
-            let result404: any = null;
-            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    provision(request: ProvisionRequest, signal?: AbortSignal): Promise<ProvisionResult> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/provision";
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            signal,
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processProvision(_response);
-        });
-    }
-
-    protected processProvision(response: Response): Promise<ProvisionResult> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 201) {
-            return response.text().then((_responseText) => {
-            let result201: any = null;
-            result201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProvisionResult;
-            return result201;
-            });
-        } else if (status === 400) {
-            return response.text().then((_responseText) => {
-            let result400: any = null;
-            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<ProvisionResult>(null as any);
-    }
-
-    /**
-     * Lists passkey credentials and OIDC identities for a member subject.
-     */
-    getMemberCredentials(id: string, subjectId: string, signal?: AbortSignal): Promise<SubjectCredentialsDto> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        if (subjectId === undefined || subjectId === null)
-            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
-        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            signal,
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGetMemberCredentials(_response);
-        });
-    }
-
-    protected processGetMemberCredentials(response: Response): Promise<SubjectCredentialsDto> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as SubjectCredentialsDto;
-            return result200;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<SubjectCredentialsDto>(null as any);
-    }
-
-    /**
-     * Attaches an OIDC identity to a member subject.
-     */
-    attachOidcIdentity(id: string, subjectId: string, request: AdminAttachOidcRequest, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/oidc";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        if (subjectId === undefined || subjectId === null)
-            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
-        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        const content_ = JSON.stringify(request);
-
-        let options_: RequestInit = {
-            body: content_,
-            method: "POST",
-            signal,
-            headers: {
-                "Content-Type": "application/json",
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processAttachOidcIdentity(_response);
-        });
-    }
-
-    protected processAttachOidcIdentity(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 204) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    /**
-     * Removes a passkey credential from a member subject.
-     */
-    removePasskeyCredential(id: string, subjectId: string, credentialId: string, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/passkey/{credentialId}";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        if (subjectId === undefined || subjectId === null)
-            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
-        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
-        if (credentialId === undefined || credentialId === null)
-            throw new globalThis.Error("The parameter 'credentialId' must be defined.");
-        url_ = url_.replace("{credentialId}", encodeURIComponent("" + credentialId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "DELETE",
-            signal,
-            headers: {
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processRemovePasskeyCredential(_response);
-        });
-    }
-
-    protected processRemovePasskeyCredential(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 204) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
-    }
-
-    /**
-     * Removes an OIDC identity from a member subject.
-     */
-    removeOidcIdentity(id: string, subjectId: string, identityId: string, signal?: AbortSignal): Promise<void> {
-        let url_ = this.baseUrl + "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/oidc/{identityId}";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        if (subjectId === undefined || subjectId === null)
-            throw new globalThis.Error("The parameter 'subjectId' must be defined.");
-        url_ = url_.replace("{subjectId}", encodeURIComponent("" + subjectId));
-        if (identityId === undefined || identityId === null)
-            throw new globalThis.Error("The parameter 'identityId' must be defined.");
-        url_ = url_.replace("{identityId}", encodeURIComponent("" + identityId));
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "DELETE",
-            signal,
-            headers: {
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processRemoveOidcIdentity(_response);
-        });
-    }
-
-    protected processRemoveOidcIdentity(response: Response): Promise<void> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 204) {
-            return response.text().then((_responseText) => {
-            return;
-            });
-        } else if (status === 403) {
-            return response.text().then((_responseText) => {
-            let result403: any = null;
-            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
-            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<void>(null as any);
     }
 }
 
@@ -13512,6 +14916,342 @@ export class MemberInviteClient {
     }
 }
 
+export class MembershipRequestClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * Submit a request to join the current tenant.
+     */
+    createRequest(request: CreateMembershipRequestRequest, signal?: AbortSignal): Promise<CreateMembershipRequestResult> {
+        let url_ = this.baseUrl + "/api/v4/membership-requests";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCreateRequest(_response);
+        });
+    }
+
+    protected processCreateRequest(response: Response): Promise<CreateMembershipRequestResult> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as CreateMembershipRequestResult;
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<CreateMembershipRequestResult>(null as any);
+    }
+
+    /**
+     * List all pending membership requests for the current tenant.
+     */
+    getPendingRequests(signal?: AbortSignal): Promise<MembershipRequestDto[]> {
+        let url_ = this.baseUrl + "/api/v4/membership-requests";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPendingRequests(_response);
+        });
+    }
+
+    protected processGetPendingRequests(response: Response): Promise<MembershipRequestDto[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MembershipRequestDto[];
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<MembershipRequestDto[]>(null as any);
+    }
+
+    /**
+     * Get the current user's membership request for this tenant, if any.
+     */
+    getMyRequest(signal?: AbortSignal): Promise<MembershipRequestDto> {
+        let url_ = this.baseUrl + "/api/v4/membership-requests/mine";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetMyRequest(_response);
+        });
+    }
+
+    protected processGetMyRequest(response: Response): Promise<MembershipRequestDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MembershipRequestDto;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<MembershipRequestDto>(null as any);
+    }
+
+    /**
+     * Approve a membership request and add the user as a tenant member.
+     */
+    approveRequest(id: string, request: ApproveMembershipRequestRequest, signal?: AbortSignal): Promise<DecideMembershipRequestResult> {
+        let url_ = this.baseUrl + "/api/v4/membership-requests/{id}/approve";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processApproveRequest(_response);
+        });
+    }
+
+    protected processApproveRequest(response: Response): Promise<DecideMembershipRequestResult> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as DecideMembershipRequestResult;
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<DecideMembershipRequestResult>(null as any);
+    }
+
+    /**
+     * Deny a membership request.
+     */
+    denyRequest(id: string, signal?: AbortSignal): Promise<DecideMembershipRequestResult> {
+        let url_ = this.baseUrl + "/api/v4/membership-requests/{id}/deny";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDenyRequest(_response);
+        });
+    }
+
+    protected processDenyRequest(response: Response): Promise<DecideMembershipRequestResult> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as DecideMembershipRequestResult;
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<DecideMembershipRequestResult>(null as any);
+    }
+
+    /**
+     * Get whether this tenant currently lets people request to become a member.
+     */
+    getMembershipRequestSettings(signal?: AbortSignal): Promise<MembershipRequestSettingsDto> {
+        let url_ = this.baseUrl + "/api/v4/membership-requests/settings";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetMembershipRequestSettings(_response);
+        });
+    }
+
+    protected processGetMembershipRequestSettings(response: Response): Promise<MembershipRequestSettingsDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MembershipRequestSettingsDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<MembershipRequestSettingsDto>(null as any);
+    }
+
+    /**
+     * Enable or disable whether people can request to become a member. Independent of public access.
+     */
+    setMembershipRequestSettings(request: UpdateMembershipRequestSettingsRequest, signal?: AbortSignal): Promise<MembershipRequestSettingsDto> {
+        let url_ = this.baseUrl + "/api/v4/membership-requests/settings";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processSetMembershipRequestSettings(_response);
+        });
+    }
+
+    protected processSetMembershipRequestSettings(response: Response): Promise<MembershipRequestSettingsDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MembershipRequestSettingsDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<MembershipRequestSettingsDto>(null as any);
+    }
+}
+
 export class MyPermissionsClient {
     private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
     private baseUrl: string;
@@ -13885,6 +15625,249 @@ export class RoleClient {
             });
         }
         return Promise.resolve<void>(null as any);
+    }
+}
+
+export class ShareLinkClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * Get the current public share link state.
+     */
+    getShareLink(signal?: AbortSignal): Promise<ShareLinkDto> {
+        let url_ = this.baseUrl + "/api/v4/share";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetShareLink(_response);
+        });
+    }
+
+    protected processGetShareLink(response: Response): Promise<ShareLinkDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ShareLinkDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ShareLinkDto>(null as any);
+    }
+
+    /**
+     * Disable public sharing and invalidate the current link.
+     */
+    disableShareLink(signal?: AbortSignal): Promise<ShareLinkDto> {
+        let url_ = this.baseUrl + "/api/v4/share";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDisableShareLink(_response);
+        });
+    }
+
+    protected processDisableShareLink(response: Response): Promise<ShareLinkDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ShareLinkDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ShareLinkDto>(null as any);
+    }
+
+    /**
+     * Mint a new share token — enables sharing, or rotates an existing link. The previous link
+    stops working immediately.
+     */
+    rotateShareLink(signal?: AbortSignal): Promise<ShareLinkDto> {
+        let url_ = this.baseUrl + "/api/v4/share/rotate";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRotateShareLink(_response);
+        });
+    }
+
+    protected processRotateShareLink(response: Response): Promise<ShareLinkDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ShareLinkDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ShareLinkDto>(null as any);
+    }
+
+    /**
+     * Choose whether the public view shows full history or only the last 24 hours.
+     */
+    setShareLinkFullHistory(request: SetShareFullHistoryRequest, signal?: AbortSignal): Promise<ShareLinkDto> {
+        let url_ = this.baseUrl + "/api/v4/share/full-history";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processSetShareLinkFullHistory(_response);
+        });
+    }
+
+    protected processSetShareLinkFullHistory(response: Response): Promise<ShareLinkDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ShareLinkDto;
+            return result200;
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ShareLinkDto>(null as any);
+    }
+
+    /**
+     * Set which data categories anonymous viewers can see. Scopes must be read-permission atoms
+    drawn from TenantPermissions.PublicShareScopes; an empty list keeps the link live but
+    shares nothing.
+     */
+    setShareLinkScopes(request: SetShareScopesRequest, signal?: AbortSignal): Promise<ShareLinkDto> {
+        let url_ = this.baseUrl + "/api/v4/share/scopes";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processSetShareLinkScopes(_response);
+        });
+    }
+
+    protected processSetShareLinkScopes(response: Response): Promise<ShareLinkDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ShareLinkDto;
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status === 403) {
+            return response.text().then((_responseText) => {
+            let result403: any = null;
+            result403 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result403);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ShareLinkDto>(null as any);
     }
 }
 
@@ -15676,6 +17659,142 @@ export class BGCheckClient {
         }
         return Promise.resolve<BGCheck>(null as any);
     }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfBGCheck> {
+        let url_ = this.baseUrl + "/api/v4/observations/bg-checks/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfBGCheck> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfBGCheck;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfBGCheck>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<BGCheck> {
+        let url_ = this.baseUrl + "/api/v4/observations/bg-checks/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<BGCheck> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BGCheck;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BGCheck>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<BGCheck[]> {
+        let url_ = this.baseUrl + "/api/v4/observations/bg-checks/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<BGCheck[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BGCheck[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BGCheck[]>(null as any);
+    }
 }
 
 export class CalibrationClient {
@@ -15944,6 +18063,142 @@ export class CalibrationClient {
         }
         return Promise.resolve<Calibration>(null as any);
     }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfCalibration> {
+        let url_ = this.baseUrl + "/api/v4/glucose/calibrations/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfCalibration> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfCalibration;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfCalibration>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<Calibration> {
+        let url_ = this.baseUrl + "/api/v4/glucose/calibrations/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<Calibration> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Calibration;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Calibration>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<Calibration[]> {
+        let url_ = this.baseUrl + "/api/v4/glucose/calibrations/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<Calibration[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Calibration[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Calibration[]>(null as any);
+    }
 }
 
 export class MeterGlucoseClient {
@@ -16211,6 +18466,142 @@ export class MeterGlucoseClient {
             });
         }
         return Promise.resolve<MeterGlucose>(null as any);
+    }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfMeterGlucose> {
+        let url_ = this.baseUrl + "/api/v4/glucose/meter/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfMeterGlucose> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfMeterGlucose;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfMeterGlucose>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<MeterGlucose> {
+        let url_ = this.baseUrl + "/api/v4/glucose/meter/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<MeterGlucose> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MeterGlucose;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<MeterGlucose>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<MeterGlucose[]> {
+        let url_ = this.baseUrl + "/api/v4/glucose/meter/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<MeterGlucose[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MeterGlucose[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<MeterGlucose[]>(null as any);
     }
 }
 
@@ -16510,6 +18901,142 @@ export class SensorGlucoseClient {
             let result400: any = null;
             result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
             return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<SensorGlucose[]>(null as any);
+    }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfSensorGlucose> {
+        let url_ = this.baseUrl + "/api/v4/glucose/sensor/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfSensorGlucose> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfSensorGlucose;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfSensorGlucose>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<SensorGlucose> {
+        let url_ = this.baseUrl + "/api/v4/glucose/sensor/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<SensorGlucose> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as SensorGlucose;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<SensorGlucose>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<SensorGlucose[]> {
+        let url_ = this.baseUrl + "/api/v4/glucose/sensor/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<SensorGlucose[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as SensorGlucose[];
+            return result200;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
@@ -17847,6 +20374,142 @@ export class DeviceEventClient {
             });
         }
         return Promise.resolve<DeviceEvent>(null as any);
+    }
+
+    /**
+     * Lists soft-deleted records available for restoration, ordered by deletion date (newest first).
+     * @param limit (optional) Maximum number of records to return. Defaults to `100`.
+     * @param offset (optional) Number of records to skip for pagination. Defaults to `0`.
+     */
+    listDeleted(limit?: number | undefined, offset?: number | undefined, signal?: AbortSignal): Promise<PaginatedResponseOfDeviceEvent> {
+        let url_ = this.baseUrl + "/api/v4/observations/device-events/deleted?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (offset === null)
+            throw new globalThis.Error("The parameter 'offset' cannot be null.");
+        else if (offset !== undefined)
+            url_ += "offset=" + encodeURIComponent("" + offset) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processListDeleted(_response);
+        });
+    }
+
+    protected processListDeleted(response: Response): Promise<PaginatedResponseOfDeviceEvent> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PaginatedResponseOfDeviceEvent;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PaginatedResponseOfDeviceEvent>(null as any);
+    }
+
+    /**
+     * Restores a soft-deleted record by ID.
+     * @param id The unique identifier of the soft-deleted record.
+     */
+    restore(id: string, signal?: AbortSignal): Promise<DeviceEvent> {
+        let url_ = this.baseUrl + "/api/v4/observations/device-events/{id}/restore";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "POST",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processRestore(_response);
+        });
+    }
+
+    protected processRestore(response: Response): Promise<DeviceEvent> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as DeviceEvent;
+            return result200;
+            });
+        } else if (status === 404) {
+            return response.text().then((_responseText) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result404);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<DeviceEvent>(null as any);
+    }
+
+    /**
+     * Restores multiple soft-deleted records by their IDs.
+     * @param ids The unique identifiers of the soft-deleted records.
+     */
+    bulkRestore(ids: string[], signal?: AbortSignal): Promise<DeviceEvent[]> {
+        let url_ = this.baseUrl + "/api/v4/observations/device-events/restore";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(ids);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBulkRestore(_response);
+        });
+    }
+
+    protected processBulkRestore(response: Response): Promise<DeviceEvent[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as DeviceEvent[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<DeviceEvent[]>(null as any);
     }
 }
 
@@ -19404,6 +22067,67 @@ export class ChartDataClient {
             });
         }
         return Promise.resolve<DashboardChartData>(null as any);
+    }
+
+    /**
+     * Gets the basal delivery series for a time window without running the
+    full IOB/COB compute pipeline. Fetches only temp basals and profile
+    data, making it significantly cheaper than the dashboard endpoint.
+     * @param startTime (optional) Start of the requested window as a Unix timestamp in milliseconds.
+     * @param endTime (optional) End of the requested window as a Unix timestamp in milliseconds.
+                Must be greater than startTime.
+     * @return A list of BasalPoint representing basal delivery over time.
+     */
+    getBasalSeries(startTime?: number | undefined, endTime?: number | undefined, signal?: AbortSignal): Promise<BasalPoint[]> {
+        let url_ = this.baseUrl + "/api/v4/ChartData/basal-series?";
+        if (startTime === null)
+            throw new globalThis.Error("The parameter 'startTime' cannot be null.");
+        else if (startTime !== undefined)
+            url_ += "startTime=" + encodeURIComponent("" + startTime) + "&";
+        if (endTime === null)
+            throw new globalThis.Error("The parameter 'endTime' cannot be null.");
+        else if (endTime !== undefined)
+            url_ += "endTime=" + encodeURIComponent("" + endTime) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetBasalSeries(_response);
+        });
+    }
+
+    protected processGetBasalSeries(response: Response): Promise<BasalPoint[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BasalPoint[];
+            return result200;
+            });
+        } else if (status === 400) {
+            return response.text().then((_responseText) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("A server side error occurred.", status, _responseText, _headers, result400);
+            });
+        } else if (status === 500) {
+            return response.text().then((_responseText) => {
+            return throwException("A server side error occurred.", status, _responseText, _headers);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<BasalPoint[]>(null as any);
     }
 }
 
@@ -21247,6 +23971,62 @@ export class StatisticsClient {
             });
         }
         return Promise.resolve<ExtendedGlucoseAnalytics>(null as any);
+    }
+
+    /**
+     * Extended glucose analytics for a date range, computed server-side. Fetches glucose,
+    manual boluses, and carb intakes for the window from the database and runs
+    AnalyzeGlucoseDataExtended plus
+    CalculateAveragedStats.
+     * @param startDate (optional) Start of the window (inclusive, UTC).
+     * @param endDate (optional) End of the window (exclusive, UTC).
+     * @param population (optional) Diabetes population for clinical target assessment. Defaults to Type 1 adult.
+     * @return The extended analytics and time-of-day averaged stats for the window.
+     */
+    getRangeAnalytics(startDate?: Date | undefined, endDate?: Date | undefined, population?: DiabetesPopulation | undefined, signal?: AbortSignal): Promise<ReportAnalysisResult> {
+        let url_ = this.baseUrl + "/api/v4/Statistics/range-analytics?";
+        if (startDate === null)
+            throw new globalThis.Error("The parameter 'startDate' cannot be null.");
+        else if (startDate !== undefined)
+            url_ += "startDate=" + encodeURIComponent(startDate ? "" + startDate.toISOString() : "") + "&";
+        if (endDate === null)
+            throw new globalThis.Error("The parameter 'endDate' cannot be null.");
+        else if (endDate !== undefined)
+            url_ += "endDate=" + encodeURIComponent(endDate ? "" + endDate.toISOString() : "") + "&";
+        if (population === null)
+            throw new globalThis.Error("The parameter 'population' cannot be null.");
+        else if (population !== undefined)
+            url_ += "population=" + encodeURIComponent("" + population) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            signal,
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetRangeAnalytics(_response);
+        });
+    }
+
+    protected processGetRangeAnalytics(response: Response): Promise<ReportAnalysisResult> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ReportAnalysisResult;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ReportAnalysisResult>(null as any);
     }
 
     /**
@@ -25034,6 +27814,7 @@ export enum PumpModeState {
     EaseOff = "EaseOff",
     Sleep = "Sleep",
     Exercise = "Exercise",
+    Liberty = "Liberty",
     Suspended = "Suspended",
     Off = "Off",
 }
@@ -25155,6 +27936,8 @@ export enum OAuthScope {
     HeartRateReadWrite = "heartrate.readwrite",
     StepCountRead = "stepcount.read",
     StepCountReadWrite = "stepcount.readwrite",
+    FoodRead = "food.read",
+    FoodReadWrite = "food.readwrite",
     StatisticsRead = "statistics.read",
     HealthRead = "health.read",
     HealthReadWrite = "health.readwrite",
@@ -25345,6 +28128,97 @@ export interface SetupOwnerOidcRequest {
     providerId?: string;
 }
 
+export interface BasalInjection {
+    id?: string;
+    timestamp?: Date;
+    mills?: number;
+    utcOffset?: number | undefined;
+    device?: string | undefined;
+    app?: string | undefined;
+    dataSource?: string | undefined;
+    syncIdentifier?: string | undefined;
+    correlationId?: string | undefined;
+    legacyId?: string | undefined;
+    createdAt?: Date;
+    modifiedAt?: Date;
+    units?: number;
+    notes?: string | undefined;
+    insulinContext?: TreatmentInsulinContext;
+    additionalProperties?: { [key: string]: any; } | undefined;
+}
+
+export interface TreatmentInsulinContext {
+    patientInsulinId?: string;
+    insulinName?: string;
+    dia?: number;
+    peak?: number;
+    curve?: string;
+    concentration?: number;
+}
+
+/** Request body for creating a new basal insulin injection record via the V4 API. */
+export interface CreateBasalInjectionRequest {
+    /** When the basal insulin was injected. Cannot be more than 5 minutes in the future. */
+    timestamp?: Date;
+    /** UTC offset in minutes at the time of the event, for local-time display. */
+    utcOffset?: number | undefined;
+    /** Identifier of the device used to record the injection (e.g. "iPhone-app"). */
+    device?: string | undefined;
+    /** Name of the application that submitted this record. */
+    app?: string | undefined;
+    /** Upstream data source identifier; required when SyncIdentifier is supplied. */
+    dataSource?: string | undefined;
+    /** Upstream sync identifier for deduplication, paired with DataSource. */
+    syncIdentifier?: string | undefined;
+    /** Reference to the PatientInsulin used for this injection. The referenced
+insulin's role must be Basal or Both. The server resolves this to a
+TreatmentInsulinContext snapshot at write time. */
+    patientInsulinId?: string;
+    /** Insulin units injected. Must be greater than zero. */
+    units?: number;
+    /** Optional free-text user note. */
+    notes?: string | undefined;
+    /** Correlation identifier for grouping related events. */
+    correlationId?: string | undefined;
+}
+
+/** Request body for updating an existing basal insulin injection record via the V4 API. The injection is identified by the route-level ID parameter. */
+export interface UpdateBasalInjectionRequest {
+    /** When the basal insulin was injected. Cannot be more than 5 minutes in the future. */
+    timestamp?: Date;
+    /** UTC offset in minutes at the time of the event, for local-time display. */
+    utcOffset?: number | undefined;
+    /** Identifier of the device used to record the injection. */
+    device?: string | undefined;
+    /** Name of the application that submitted this record. */
+    app?: string | undefined;
+    /** Upstream data source identifier; required when SyncIdentifier is supplied. */
+    dataSource?: string | undefined;
+    /** Upstream sync identifier for deduplication, paired with DataSource. */
+    syncIdentifier?: string | undefined;
+    /** Reference to the PatientInsulin used for this injection. The referenced
+insulin's role must be Basal or Both. The server resolves this to a
+TreatmentInsulinContext snapshot at write time. */
+    patientInsulinId?: string;
+    /** Insulin units injected. Must be greater than zero. */
+    units?: number;
+    /** Optional free-text user note. */
+    notes?: string | undefined;
+    /** Correlation identifier for grouping related events. */
+    correlationId?: string | undefined;
+}
+
+export interface PaginatedResponseOfBasalInjection {
+    data?: BasalInjection[];
+    pagination?: PaginationInfo;
+}
+
+export interface PaginationInfo {
+    limit?: number;
+    offset?: number;
+    total?: number;
+}
+
 export interface BolusCalculation {
     id?: string;
     timestamp?: Date;
@@ -25424,12 +28298,6 @@ export interface PaginatedResponseOfBolusCalculation {
     pagination?: PaginationInfo;
 }
 
-export interface PaginationInfo {
-    limit?: number;
-    offset?: number;
-    total?: number;
-}
-
 export interface PaginatedResponseOfBolus {
     data?: Bolus[];
     pagination?: PaginationInfo;
@@ -25475,15 +28343,6 @@ export enum BolusType {
 export enum BolusKind {
     Manual = "Manual",
     Algorithm = "Algorithm",
-}
-
-export interface TreatmentInsulinContext {
-    patientInsulinId?: string;
-    insulinName?: string;
-    dia?: number;
-    peak?: number;
-    curve?: string;
-    concentration?: number;
 }
 
 /** Request body for creating a new insulin bolus record via the V4 API. */
@@ -25930,6 +28789,7 @@ export interface ProcessableDocumentBase {
 export interface Entry extends ProcessableDocumentBase {
     _id?: string | undefined;
     mills?: number;
+    date?: number;
     dateString?: string | undefined;
     mgdl?: number;
     mbg?: number | undefined;
@@ -26644,6 +29504,7 @@ export interface ClockSettings {
     alwaysShowTime?: boolean;
     backgroundImage?: string | undefined;
     backgroundOpacity?: number;
+    screensaverMode?: boolean;
 }
 
 export interface ClockFaceListItem {
@@ -27349,6 +30210,315 @@ export interface UpdateUserPreferencesRequest {
     preferredLanguage?: string | undefined;
 }
 
+export interface AccessRequestDto {
+    subjectId?: string;
+    name?: string;
+    message?: string | undefined;
+    createdAt?: Date;
+}
+
+export interface ApproveAccessRequestRequest {
+    roleIds?: string[];
+    directPermissions?: string[] | undefined;
+}
+
+/** A tenant and the connectors it has configured. */
+export interface TenantConnectorsDto {
+    /** The tenant id. */
+    tenantId?: string;
+    /** The tenant slug, for display. */
+    tenantSlug?: string;
+    /** One entry per configured connector. */
+    connectors?: TenantConnectorSummary[];
+}
+
+/** Sync/health summary for a single configured connector. */
+export interface TenantConnectorSummary {
+    /** The connector name (e.g. nightscout). */
+    connectorName?: string;
+    /** Whether the connector last reported healthy. */
+    isHealthy?: boolean;
+    /** When the connector last completed a successful sync. */
+    lastSuccessfulSync?: Date | undefined;
+    /** When the connector last attempted a sync. */
+    lastSyncAttempt?: Date | undefined;
+    /** The most recent error message, if any. */
+    lastErrorMessage?: string | undefined;
+}
+
+/** Summary returned when a reset job is created (202 Accepted). */
+export interface ConnectorResetJobInfo {
+    /** The job id, used to poll status. */
+    jobId?: string;
+    /** The target tenant being reset. */
+    tenantId?: string;
+    /** The target tenant's slug, for display. */
+    tenantSlug?: string;
+    /** When the job was created. */
+    createdAt?: Date;
+    /** The job's current state. */
+    state?: ConnectorResetJobState;
+    /** How many connectors the job will reset. */
+    totalConnectors?: number;
+}
+
+/** Lifecycle state of a connector cursor reset job. */
+export enum ConnectorResetJobState {
+    Pending = "Pending",
+    Running = "Running",
+    Completed = "Completed",
+    Failed = "Failed",
+    Cancelled = "Cancelled",
+}
+
+/** Request body for a cross-tenant cursor reset. Mirrors the per-tenant ResetCursorRequest shape. */
+export interface AdminResetCursorsRequest {
+    /** Optional lower bound for the re-pull. When null, all available history is re-ingested. */
+    from?: Date | undefined;
+    /** Optional set of data types to reset. When null or empty, every supported data type is reset. */
+    dataTypes?: SyncDataType[] | undefined;
+}
+
+export enum SyncDataType {
+    Glucose = "Glucose",
+    ManualBG = "ManualBG",
+    Calibrations = "Calibrations",
+    Boluses = "Boluses",
+    CarbIntake = "CarbIntake",
+    BGChecks = "BGChecks",
+    BolusCalculations = "BolusCalculations",
+    Notes = "Notes",
+    DeviceEvents = "DeviceEvents",
+    StateSpans = "StateSpans",
+    Profiles = "Profiles",
+    DeviceStatus = "DeviceStatus",
+    Activity = "Activity",
+    Food = "Food",
+}
+
+/** A pollable snapshot of a reset job's progress. */
+export interface ConnectorResetJobStatus {
+    /** The job id. */
+    jobId?: string;
+    /** The target tenant being reset. */
+    tenantId?: string;
+    /** The target tenant's slug, for display. */
+    tenantSlug?: string;
+    /** The job's current lifecycle state. */
+    state?: ConnectorResetJobState;
+    /** When the job was created. */
+    createdAt?: Date;
+    /** When the background work started, or null if not yet started. */
+    startedAt?: Date | undefined;
+    /** When the job reached a terminal state, or null if still running. */
+    completedAt?: Date | undefined;
+    /** An error message when the whole job failed (not a single connector). */
+    errorMessage?: string | undefined;
+    /** Total connectors the job will reset. */
+    totalConnectors?: number;
+    /** How many connectors have finished (succeeded or failed). */
+    completedConnectors?: number;
+    /** Per-connector progress, in configured order. */
+    connectors?: ConnectorResetConnectorProgress[];
+}
+
+/** Progress for a single connector within a reset job. */
+export interface ConnectorResetConnectorProgress {
+    /** The connector name (e.g. nightscout). */
+    connectorName?: string;
+    /** The connector's current state in this job. */
+    state?: ConnectorResetConnectorState;
+    /** A human-readable message for the outcome, once the connector has completed. */
+    message?: string | undefined;
+    /** The full sync result, once the connector has completed. */
+    result?: SyncResult | undefined;
+}
+
+/** State of a single connector within a reset job. */
+export enum ConnectorResetConnectorState {
+    Pending = "Pending",
+    Running = "Running",
+    Succeeded = "Succeeded",
+    Failed = "Failed",
+}
+
+export interface SyncResult {
+    success?: boolean;
+    message?: string;
+    startTime?: Date;
+    endTime?: Date;
+    itemsSynced?: { [key in keyof typeof SyncDataType]?: number; };
+    lastEntryTimes?: { [key in keyof typeof SyncDataType]?: Date; };
+    errors?: string[];
+}
+
+export interface PlatformSettingsSummary {
+    category?: string;
+    enabled?: boolean;
+    configuredFields?: string[];
+    fields?: FieldDefinition[];
+}
+
+export interface FieldDefinition {
+    name?: string;
+    label?: string;
+    required?: boolean;
+}
+
+export interface UpsertPlatformSettingsRequest {
+    enabled?: boolean;
+    fields?: { [key: string]: string; };
+}
+
+export interface PlatformCredentials {
+    category?: string;
+    enabled?: boolean;
+    fields?: { [key: string]: string; };
+}
+
+export interface TenantDetailDto {
+    id?: string;
+    slug?: string;
+    displayName?: string;
+    isActive?: boolean;
+    sysCreatedAt?: Date;
+    members?: TenantMemberDto[];
+}
+
+export interface TenantMemberDto {
+    id?: string;
+    subjectId?: string;
+    name?: string | undefined;
+    isSystemSubject?: boolean;
+    roles?: TenantMemberRoleDto[];
+    directPermissions?: string[] | undefined;
+    label?: string | undefined;
+    limitTo24Hours?: boolean;
+    lastUsedAt?: Date | undefined;
+    sysCreatedAt?: Date;
+    isPlatformAdmin?: boolean;
+}
+
+export interface TenantMemberRoleDto {
+    roleId?: string;
+    name?: string;
+    slug?: string;
+}
+
+export interface CreateTenantRequest {
+    slug?: string;
+    displayName?: string;
+}
+
+export interface UpdateTenantRequest {
+    displayName?: string;
+    isActive?: boolean;
+    allowAccessRequests?: boolean | undefined;
+}
+
+export interface AddMemberRequest {
+    subjectId?: string;
+    roleIds?: string[];
+    directPermissions?: string[] | undefined;
+}
+
+export interface MemberInviteResult {
+    id?: string;
+    token?: string;
+    inviteUrl?: string;
+    expiresAt?: Date;
+}
+
+export interface CreateMemberInviteRequest {
+    roleIds?: string[];
+    directPermissions?: string[] | undefined;
+    label?: string | undefined;
+    expiresInDays?: number;
+    maxUses?: number | undefined;
+    limitTo24Hours?: boolean;
+}
+
+export interface MemberInviteInfo {
+    id?: string;
+    tenantId?: string;
+    tenantName?: string;
+    createdByName?: string;
+    roleIds?: string[];
+    directPermissions?: string[] | undefined;
+    label?: string | undefined;
+    limitTo24Hours?: boolean;
+    expiresAt?: Date;
+    maxUses?: number | undefined;
+    useCount?: number;
+    isValid?: boolean;
+    isExpired?: boolean;
+    isRevoked?: boolean;
+    createdAt?: Date;
+    usedBy?: InviteUsageInfo[];
+}
+
+export interface InviteUsageInfo {
+    subjectId?: string;
+    name?: string | undefined;
+    joinedAt?: Date;
+}
+
+export interface ProvisionResult {
+    tenantId?: string;
+    subjectId?: string;
+    slug?: string;
+}
+
+export interface ProvisionRequest {
+    slug?: string;
+    displayName?: string;
+    ownerUsername?: string;
+    ownerEmail?: string;
+    credential?: ProvisionCredentialData | undefined;
+    oidcIdentity?: ProvisionOidcIdentityData | undefined;
+}
+
+export interface ProvisionCredentialData {
+    credentialId?: string;
+    publicKey?: string;
+    signCount?: number;
+    transports?: string[];
+    aaGuid?: string | undefined;
+    subjectId?: string | undefined;
+}
+
+export interface ProvisionOidcIdentityData {
+    provider?: string;
+    oidcSubjectId?: string;
+    issuer?: string;
+    email?: string;
+    subjectId?: string | undefined;
+}
+
+export interface SubjectCredentialsDto {
+    passkeys?: PasskeyCredentialDto[];
+    oidcIdentities?: OidcIdentityDto[];
+}
+
+export interface PasskeyCredentialDto {
+    id?: string;
+    displayName?: string | undefined;
+    createdAt?: Date;
+}
+
+export interface OidcIdentityDto {
+    id?: string;
+    provider?: string;
+    email?: string | undefined;
+}
+
+export interface AdminAttachOidcRequest {
+    providerId?: string;
+    oidcSubjectId?: string;
+    issuer?: string;
+    email?: string | undefined;
+}
+
 /** Proxy configuration DTO */
 export interface ProxyConfigurationDto {
     nightscoutUrl?: string;
@@ -27581,37 +30751,20 @@ export interface ConnectorDataSummary {
     total?: number;
 }
 
-export interface SyncResult {
-    success?: boolean;
-    message?: string;
-    startTime?: Date;
-    endTime?: Date;
-    itemsSynced?: { [key in keyof typeof SyncDataType]?: number; };
-    lastEntryTimes?: { [key in keyof typeof SyncDataType]?: Date; };
-    errors?: string[];
-}
-
-export enum SyncDataType {
-    Glucose = "Glucose",
-    ManualBG = "ManualBG",
-    Calibrations = "Calibrations",
-    Boluses = "Boluses",
-    CarbIntake = "CarbIntake",
-    BGChecks = "BGChecks",
-    BolusCalculations = "BolusCalculations",
-    Notes = "Notes",
-    DeviceEvents = "DeviceEvents",
-    StateSpans = "StateSpans",
-    Profiles = "Profiles",
-    DeviceStatus = "DeviceStatus",
-    Activity = "Activity",
-    Food = "Food",
-}
-
 export interface SyncRequest {
     from?: Date | undefined;
     to?: Date | undefined;
     dataTypes?: SyncDataType[];
+}
+
+/** Request body for resetting a connector's sync cursor and re-pulling history. */
+export interface ResetCursorRequest {
+    /** Optional lower bound for the re-pull. When null, no lower bound is applied and all
+available history is re-ingested. */
+    from?: Date | undefined;
+    /** Optional set of data types to reset. When null or empty, every data type the connector
+supports is re-pulled. */
+    dataTypes?: SyncDataType[] | undefined;
 }
 
 /** Response model for connector sync status */
@@ -27659,6 +30812,9 @@ export interface StatusResponse {
     authorized?: any | undefined;
     runtimeState?: string | undefined;
     head?: string | undefined;
+    isDemo?: boolean | undefined;
+    nextResetAt?: Date | undefined;
+    anonymousReadAccess?: boolean;
 }
 
 export interface CreateIssueResponse {
@@ -27710,6 +30866,8 @@ export enum ChannelType {
     TelegramGroup = "telegram_group",
     WhatsApp = "whatsapp",
     WhatsAppDm = "whatsapp_dm",
+    HomeAssistant = "home_assistant",
+    ResendEmail = "resend_email",
 }
 
 export enum ChannelStatus {
@@ -27767,159 +30925,6 @@ export interface CreateSystemEventRequest {
     metadata?: { [key: string]: any; } | undefined;
     /** Gets or sets the original MongoDB ObjectId, preserved for migration compatibility. */
     originalId?: string | undefined;
-}
-
-export interface AccessRequestDto {
-    subjectId?: string;
-    name?: string;
-    message?: string | undefined;
-    createdAt?: Date;
-}
-
-export interface ApproveAccessRequestRequest {
-    roleIds?: string[];
-    directPermissions?: string[] | undefined;
-}
-
-export interface TenantDetailDto {
-    id?: string;
-    slug?: string;
-    displayName?: string;
-    isActive?: boolean;
-    sysCreatedAt?: Date;
-    members?: TenantMemberDto[];
-}
-
-export interface TenantMemberDto {
-    id?: string;
-    subjectId?: string;
-    name?: string | undefined;
-    roles?: TenantMemberRoleDto[];
-    directPermissions?: string[] | undefined;
-    label?: string | undefined;
-    limitTo24Hours?: boolean;
-    lastUsedAt?: Date | undefined;
-    sysCreatedAt?: Date;
-}
-
-export interface TenantMemberRoleDto {
-    roleId?: string;
-    name?: string;
-    slug?: string;
-}
-
-export interface CreateTenantRequest {
-    slug?: string;
-    displayName?: string;
-}
-
-export interface UpdateTenantRequest {
-    displayName?: string;
-    isActive?: boolean;
-    allowAccessRequests?: boolean | undefined;
-}
-
-export interface AddMemberRequest {
-    subjectId?: string;
-    roleIds?: string[];
-    directPermissions?: string[] | undefined;
-}
-
-export interface MemberInviteResult {
-    id?: string;
-    token?: string;
-    inviteUrl?: string;
-    expiresAt?: Date;
-}
-
-export interface CreateMemberInviteRequest {
-    roleIds?: string[];
-    directPermissions?: string[] | undefined;
-    label?: string | undefined;
-    expiresInDays?: number;
-    maxUses?: number | undefined;
-    limitTo24Hours?: boolean;
-}
-
-export interface MemberInviteInfo {
-    id?: string;
-    tenantId?: string;
-    tenantName?: string;
-    createdByName?: string;
-    roleIds?: string[];
-    directPermissions?: string[] | undefined;
-    label?: string | undefined;
-    limitTo24Hours?: boolean;
-    expiresAt?: Date;
-    maxUses?: number | undefined;
-    useCount?: number;
-    isValid?: boolean;
-    isExpired?: boolean;
-    isRevoked?: boolean;
-    createdAt?: Date;
-    usedBy?: InviteUsageInfo[];
-}
-
-export interface InviteUsageInfo {
-    subjectId?: string;
-    name?: string | undefined;
-    joinedAt?: Date;
-}
-
-export interface ProvisionResult {
-    tenantId?: string;
-    subjectId?: string;
-    slug?: string;
-}
-
-export interface ProvisionRequest {
-    slug?: string;
-    displayName?: string;
-    ownerUsername?: string;
-    ownerEmail?: string;
-    credential?: ProvisionCredentialData | undefined;
-    oidcIdentity?: ProvisionOidcIdentityData | undefined;
-}
-
-export interface ProvisionCredentialData {
-    credentialId?: string;
-    publicKey?: string;
-    signCount?: number;
-    transports?: string[];
-    aaGuid?: string | undefined;
-    subjectId?: string | undefined;
-}
-
-export interface ProvisionOidcIdentityData {
-    provider?: string;
-    oidcSubjectId?: string;
-    issuer?: string;
-    email?: string;
-    subjectId?: string | undefined;
-}
-
-export interface SubjectCredentialsDto {
-    passkeys?: PasskeyCredentialDto[];
-    oidcIdentities?: OidcIdentityDto[];
-}
-
-export interface PasskeyCredentialDto {
-    id?: string;
-    displayName?: string | undefined;
-    createdAt?: Date;
-}
-
-export interface OidcIdentityDto {
-    id?: string;
-    provider?: string;
-    email?: string | undefined;
-}
-
-export interface AdminAttachOidcRequest {
-    providerId?: string;
-    oidcSubjectId?: string;
-    issuer?: string;
-    email?: string | undefined;
 }
 
 export interface AlertCustomSoundResponse {
@@ -28132,6 +31137,7 @@ export interface ActiveExcursionResponse {
     alertRuleId?: string;
     ruleName?: string;
     conditionType?: AlertConditionType;
+    severity?: AlertRuleSeverity;
     startedAt?: Date;
     acknowledgedAt?: Date | undefined;
     acknowledgedBy?: string | undefined;
@@ -28267,12 +31273,10 @@ export interface TenantAlertSettingsResponse {
     dndManualStartedAt?: Date | undefined;
     /** True when a recurring scheduled DND window is configured. */
     dndScheduleEnabled?: boolean;
-    /** Local-time start of the scheduled DND window (in Timezone). */
+    /** Local-time start of the scheduled DND window, interpreted in the patient's timezone. */
     dndScheduleStart?: string | undefined;
     /** Local-time end of the scheduled DND window. Cross-midnight windows allowed. */
     dndScheduleEnd?: string | undefined;
-    /** IANA timezone (e.g. Europe/London) for the scheduled window. */
-    timezone?: string;
 }
 
 export interface UpdateTenantAlertSettingsRequest {
@@ -28281,7 +31285,6 @@ export interface UpdateTenantAlertSettingsRequest {
     dndScheduleEnabled?: boolean;
     dndScheduleStart?: string | undefined;
     dndScheduleEnd?: string | undefined;
-    timezone?: string;
 }
 
 /** DTO for tracker alerts returned to the frontend */
@@ -28650,6 +31653,42 @@ export interface SetMemberLimitTo24HoursRequest {
     limitTo24Hours?: boolean;
 }
 
+export interface CreateMembershipRequestResult {
+    success?: boolean;
+    error?: string | undefined;
+}
+
+export interface CreateMembershipRequestRequest {
+    message?: string | undefined;
+}
+
+export interface MembershipRequestDto {
+    id?: string;
+    subjectId?: string;
+    subjectName?: string | undefined;
+    avatarUrl?: string | undefined;
+    message?: string | undefined;
+    status?: string;
+    createdAt?: Date;
+}
+
+export interface DecideMembershipRequestResult {
+    success?: boolean;
+    error?: string | undefined;
+}
+
+export interface ApproveMembershipRequestRequest {
+    roleIds?: string[];
+}
+
+export interface MembershipRequestSettingsDto {
+    allowRequests?: boolean;
+}
+
+export interface UpdateMembershipRequestSettingsRequest {
+    allowRequests?: boolean;
+}
+
 export interface CreateMyTenantRequest {
     slug?: string;
     displayName?: string;
@@ -28676,6 +31715,30 @@ export interface UpdateRoleRequest {
     name?: string;
     description?: string | undefined;
     permissions?: string[];
+}
+
+/** Current state of a tenant's single public share link. */
+export interface ShareLinkDto {
+    /** Whether a public share link is currently active. */
+    enabled?: boolean;
+    /** The full share URL when enabled; null otherwise. The raw token is never returned separately. */
+    url?: string | undefined;
+    /** When true the public view shows full history; when false, only the last 24 hours. */
+    fullHistory?: boolean;
+    /** The data categories anonymous viewers can see, as read-permission atoms (e.g. glucose.read).
+A subset of PublicShareScopes.
+Empty means the link is live but nothing is shared yet. */
+    scopes?: string[];
+    /** When the share link was last accessed, or null if never (or not yet recorded). */
+    lastAccessedAt?: Date | undefined;
+}
+
+export interface SetShareFullHistoryRequest {
+    fullHistory?: boolean;
+}
+
+export interface SetShareScopesRequest {
+    scopes?: string[];
 }
 
 export interface PaginatedResponseOfActivity {
@@ -28800,6 +31863,7 @@ export interface PatientRecord {
     preferredName?: string | undefined;
     pronouns?: string | undefined;
     avatarUrl?: string | undefined;
+    timezone?: string | undefined;
     createdAt?: Date;
     modifiedAt?: Date;
 }
@@ -29174,8 +32238,6 @@ export interface TenantEntityDto {
     displayName?: string;
     isActive?: boolean;
     lastReadingAt?: Date | undefined;
-    timezone?: string;
-    subjectName?: string | undefined;
     allowAccessRequests?: boolean;
     sysCreatedAt?: Date;
     sysUpdatedAt?: Date;
@@ -29295,7 +32357,6 @@ export interface DevTenantSummaryDto {
     slug?: string;
     displayName?: string;
     isActive?: boolean;
-    timezone?: string;
     createdAt?: Date;
     entries?: number;
     treatments?: number;
@@ -29823,6 +32884,7 @@ export interface DashboardChartData {
     activitySpans?: ChartStateSpanDto[];
     tempBasalSpans?: ChartStateSpanDto[];
     basalDeliverySpans?: BasalDeliverySpanDto[];
+    basalInjectionMarkers?: BasalInjectionMarkerDto[];
     systemEventMarkers?: SystemEventMarkerDto[];
     trackerMarkers?: TrackerMarkerDto[];
     heartRateSeries?: HeartRatePointDto[];
@@ -29870,6 +32932,7 @@ export enum ChartColor {
     PumpModeExercise = "pump-mode-exercise",
     PumpModeSuspended = "pump-mode-suspended",
     PumpModeOff = "pump-mode-off",
+    PumpModeLiberty = "pump-mode-liberty",
     SystemEventAlarm = "system-event-alarm",
     SystemEventHazard = "system-event-hazard",
     SystemEventWarning = "system-event-warning",
@@ -29957,6 +33020,13 @@ export interface BasalDeliverySpanDto {
     source?: string | undefined;
     fillColor?: ChartColor;
     strokeColor?: ChartColor;
+}
+
+export interface BasalInjectionMarkerDto {
+    id?: string;
+    time?: number;
+    units?: number;
+    insulinName?: string | undefined;
 }
 
 export interface SystemEventMarkerDto {
@@ -30752,6 +33822,11 @@ export interface ExtendedGlucoseAnalyticsRequest {
     config?: ExtendedAnalysisConfig | undefined;
 }
 
+export interface ReportAnalysisResult {
+    analysis?: ExtendedGlucoseAnalytics;
+    averagedStats?: AveragedStats[];
+}
+
 /** Request model for clinical assessment */
 export interface ClinicalAssessmentRequest {
     /** Glucose analytics to assess */
@@ -31350,6 +34425,10 @@ export interface SessionInfo {
     preferredLanguage?: string | undefined;
     /** Whether this subject has platform-level admin access */
     isPlatformAdmin?: boolean;
+    /** Whether this session is a short-lived platform-admin access grant on a tenant the
+subject is NOT a member of (as opposed to ordinary membership). Authoritative signal
+for the "platform admin access" indicator in the UI. */
+    isPlatformAccessGrant?: boolean;
     /** URL to the subject's avatar image */
     avatarUrl?: string | undefined;
 }

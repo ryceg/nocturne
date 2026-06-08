@@ -43,7 +43,6 @@
         dndScheduleEnabled: settings?.dndScheduleEnabled ?? false,
         dndScheduleStart: settings?.dndScheduleStart,
         dndScheduleEnd: settings?.dndScheduleEnd,
-        timezone: settings?.timezone ?? "UTC",
       });
       settings = r;
       expanded = false;

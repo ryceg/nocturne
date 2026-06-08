@@ -36,10 +36,10 @@ describe("defaultHaloDialConfig", () => {
     expect(config.iobMaxUnits).toBe(8.0);
     expect(config.cobMaxGrams).toBe(80.0);
 
-    expect(config.corners.tl).toEqual([]);
-    expect(config.corners.tr).toEqual([HaloDialCornerElement.LoopDot]);
-    expect(config.corners.bl).toEqual([]);
-    expect(config.corners.br).toEqual([
+    expect(config.corners!.tl).toEqual([]);
+    expect(config.corners!.tr).toEqual([HaloDialCornerElement.LoopDot]);
+    expect(config.corners!.bl).toEqual([]);
+    expect(config.corners!.br).toEqual([
       HaloDialCornerElement.Direction,
       HaloDialCornerElement.Eventual,
       HaloDialCornerElement.LoopLabel,
@@ -52,8 +52,8 @@ describe("defaultHaloDialConfig", () => {
 describe("DEFAULT_ELEMENT_OPTIONS", () => {
   it("has an entry for every corner element", () => {
     for (const value of Object.values(HaloDialCornerElement)) {
-      expect(DEFAULT_ELEMENT_OPTIONS[value as HaloDialCornerElement]).toBeDefined();
-      expect(DEFAULT_ELEMENT_OPTIONS[value as HaloDialCornerElement].kind).toBe(value);
+      expect(DEFAULT_ELEMENT_OPTIONS[value as keyof typeof DEFAULT_ELEMENT_OPTIONS]).toBeDefined();
+      expect(DEFAULT_ELEMENT_OPTIONS[value as keyof typeof DEFAULT_ELEMENT_OPTIONS].kind).toBe(value);
     }
   });
 });

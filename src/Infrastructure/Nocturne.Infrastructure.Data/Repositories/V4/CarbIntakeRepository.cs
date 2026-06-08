@@ -8,6 +8,7 @@ using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Entities.V4;
 using Nocturne.Infrastructure.Data.Extensions;
 using Nocturne.Infrastructure.Data.Mappers.V4;
+using Nocturne.Infrastructure.Data.Services;
 
 namespace Nocturne.Infrastructure.Data.Repositories.V4;
 
@@ -17,7 +18,7 @@ namespace Nocturne.Infrastructure.Data.Repositories.V4;
 /// </summary>
 public class CarbIntakeRepository : ICarbIntakeRepository
 {
-    private readonly NocturneDbContext _context;
+    private readonly ITenantDbContextFactory _contextFactory;
     private readonly IDeduplicationService _deduplicationService;
     private readonly IAuditContext _auditContext;
     private readonly ILogger<CarbIntakeRepository> _logger;
@@ -25,17 +26,17 @@ public class CarbIntakeRepository : ICarbIntakeRepository
     /// <summary>
     /// Initializes a new instance of the <see cref="CarbIntakeRepository"/> class.
     /// </summary>
-    /// <param name="context">The database context.</param>
+    /// <param name="contextFactory">The tenant database context factory.</param>
     /// <param name="deduplicationService">The deduplication service.</param>
     /// <param name="auditContext">The audit context for tracking mutations.</param>
     /// <param name="logger">The logger instance.</param>
     public CarbIntakeRepository(
-        NocturneDbContext context,
+        ITenantDbContextFactory contextFactory,
         IDeduplicationService deduplicationService,
         IAuditContext auditContext,
         ILogger<CarbIntakeRepository> logger)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _deduplicationService = deduplicationService;
         _auditContext = auditContext;
         _logger = logger;
@@ -71,7 +72,8 @@ public class CarbIntakeRepository : ICarbIntakeRepository
         CancellationToken ct = default
     )
     {
-        var query = _context.CarbIntakes.AsNoTracking().AsQueryable();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.CarbIntakes.AsNoTracking().AsQueryable();
         if (from.HasValue)
             query = query.Where(e => e.Timestamp >= from.Value);
         if (to.HasValue)
@@ -84,7 +86,7 @@ public class CarbIntakeRepository : ICarbIntakeRepository
             query = query.Where(e => e.LegacyId == null);
 
         // Exclude non-primary duplicates from cross-connector deduplication
-        query = query.Where(b => !_context.LinkedRecords
+        query = query.Where(b => !ctx.LinkedRecords
             .Any(lr => lr.RecordType == "carbintake" && !lr.IsPrimary && lr.RecordId == b.Id));
 
         // Keyset cursor — when provided, replaces OFFSET with a WHERE clause
@@ -119,7 +121,8 @@ public class CarbIntakeRepository : ICarbIntakeRepository
     /// <returns>The carbohydrate intake, or null if not found.</returns>
     public async Task<CarbIntake?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var entity = await _context.CarbIntakes.FindAsync([id], ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.CarbIntakes.FindAsync([id], ct);
         return entity is null ? null : CarbIntakeMapper.ToDomainModel(entity);
     }
 
@@ -134,7 +137,8 @@ public class CarbIntakeRepository : ICarbIntakeRepository
         CancellationToken ct = default
     )
     {
-        var entity = await _context.CarbIntakes.FirstOrDefaultAsync(
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.CarbIntakes.FirstOrDefaultAsync(
             e => e.LegacyId == legacyId,
             ct
         );
@@ -153,23 +157,24 @@ public class CarbIntakeRepository : ICarbIntakeRepository
     /// <returns>The created or updated carbohydrate intake.</returns>
     public async Task<CarbIntake> CreateAsync(CarbIntake model, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         if (!string.IsNullOrEmpty(model.DataSource) && !string.IsNullOrEmpty(model.SyncIdentifier))
         {
-            var existing = await _context.CarbIntakes
+            var existing = await ctx.CarbIntakes
                 .FirstOrDefaultAsync(
                     e => e.DataSource == model.DataSource && e.SyncIdentifier == model.SyncIdentifier,
                     ct);
             if (existing != null)
             {
                 CarbIntakeMapper.UpdateEntity(existing, model);
-                await _context.SaveChangesAsync(ct);
+                await ctx.SaveChangesAsync(ct);
                 return CarbIntakeMapper.ToDomainModel(existing);
             }
         }
 
         var entity = CarbIntakeMapper.ToEntity(model);
-        _context.CarbIntakes.Add(entity);
-        await _context.SaveChangesAsync(ct);
+        ctx.CarbIntakes.Add(entity);
+        await ctx.SaveChangesAsync(ct);
         return CarbIntakeMapper.ToDomainModel(entity);
     }
 
@@ -186,11 +191,12 @@ public class CarbIntakeRepository : ICarbIntakeRepository
         CancellationToken ct = default
     )
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity =
-            await _context.CarbIntakes.FindAsync([id], ct)
+            await ctx.CarbIntakes.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"CarbIntake {id} not found");
         CarbIntakeMapper.UpdateEntity(entity, model);
-        await _context.SaveChangesAsync(ct);
+        await ctx.SaveChangesAsync(ct);
         return CarbIntakeMapper.ToDomainModel(entity);
     }
 
@@ -201,11 +207,61 @@ public class CarbIntakeRepository : ICarbIntakeRepository
     /// <param name="ct">The cancellation token.</param>
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity =
-            await _context.CarbIntakes.FindAsync([id], ct)
+            await ctx.CarbIntakes.FindAsync([id], ct)
             ?? throw new KeyNotFoundException($"CarbIntake {id} not found");
-        _context.CarbIntakes.Remove(entity);
-        await _context.SaveChangesAsync(ct);
+        entity.DeletedAt = DateTime.UtcNow;
+        await ctx.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<CarbIntake> RestoreAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entity = await ctx.CarbIntakes.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.Id == id && e.DeletedAt != null)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException($"Soft-deleted CarbIntake {id} not found");
+        entity.DeletedAt = null;
+        await ctx.SaveChangesAsync(ct);
+        return CarbIntakeMapper.ToDomainModel(entity);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<CarbIntake>> BulkRestoreAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var idSet = ids.ToHashSet();
+        var entities = await ctx.CarbIntakes.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && idSet.Contains(e.Id) && e.DeletedAt != null)
+            .ToListAsync(ct);
+        foreach (var entity in entities)
+            entity.DeletedAt = null;
+        await ctx.SaveChangesAsync(ct);
+        return entities.Select(CarbIntakeMapper.ToDomainModel);
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<CarbIntake>> GetDeletedAsync(int limit, int offset, CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entities = await ctx.CarbIntakes.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.DeletedAt != null)
+            .OrderByDescending(e => e.DeletedAt)
+            .Skip(offset).Take(limit)
+            .AsNoTracking()
+            .ToListAsync(ct);
+        return entities.Select(CarbIntakeMapper.ToDomainModel);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountDeletedAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.CarbIntakes.IgnoreQueryFilters()
+            .Where(e => e.TenantId == ctx.TenantId && e.DeletedAt != null)
+            .CountAsync(ct);
     }
 
     /// <summary>
@@ -217,11 +273,19 @@ public class CarbIntakeRepository : ICarbIntakeRepository
     /// <returns>The count of matching records.</returns>
     public async Task<int> CountAsync(DateTime? from, DateTime? to, CancellationToken ct = default)
     {
-        var query = _context.CarbIntakes.AsNoTracking().AsQueryable();
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var query = ctx.CarbIntakes.AsNoTracking().AsQueryable();
         if (from.HasValue)
             query = query.Where(e => e.Timestamp >= from.Value);
         if (to.HasValue)
             query = query.Where(e => e.Timestamp <= to.Value);
+
+        // Exclude non-primary duplicates from cross-connector deduplication so the
+        // count matches the rows GetAsync returns (otherwise pagination totals are
+        // inflated by duplicate meals imported from multiple connectors).
+        query = query.Where(b => !ctx.LinkedRecords
+            .Any(lr => lr.RecordType == "carbintake" && !lr.IsPrimary && lr.RecordId == b.Id));
+
         return await query.CountAsync(ct);
     }
 
@@ -236,7 +300,8 @@ public class CarbIntakeRepository : ICarbIntakeRepository
         CancellationToken ct = default
     )
     {
-        var entities = await _context
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entities = await ctx
             .CarbIntakes.AsNoTracking()
             .Where(e => e.CorrelationId == correlationId)
             .ToListAsync(ct);
@@ -251,8 +316,9 @@ public class CarbIntakeRepository : ICarbIntakeRepository
     /// <returns>The number of deleted records.</returns>
     public async Task<int> DeleteByLegacyIdAsync(string legacyId, CancellationToken ct = default)
     {
-        return await _context.AuditedExecuteDeleteAsync(
-            _context.CarbIntakes.Where(e => e.LegacyId == legacyId), _auditContext, ct);
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.AuditedSoftDeleteAsync(
+            ctx.CarbIntakes.Where(e => e.LegacyId == legacyId), _auditContext, ct);
     }
 
     /// <summary>
@@ -264,8 +330,9 @@ public class CarbIntakeRepository : ICarbIntakeRepository
     /// <returns>The number of deleted records.</returns>
     public async Task<int> DeleteBySyncIdentifierAsync(string dataSource, string syncIdentifier, CancellationToken ct = default)
     {
-        return await _context.AuditedExecuteDeleteAsync(
-            _context.CarbIntakes.Where(e => e.DataSource == dataSource && e.SyncIdentifier == syncIdentifier),
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.AuditedSoftDeleteAsync(
+            ctx.CarbIntakes.Where(e => e.DataSource == dataSource && e.SyncIdentifier == syncIdentifier),
             _auditContext, ct);
     }
 
@@ -280,126 +347,144 @@ public class CarbIntakeRepository : ICarbIntakeRepository
         CancellationToken ct = default
     )
     {
-        var entities = records.Select(CarbIntakeMapper.ToEntity).ToList();
-        if (entities.Count == 0)
-            return [];
-
-        // Intra-batch SyncIdentifier dedup: keep last occurrence per
-        // (DataSource, SyncIdentifier). Records without both keys keep a
-        // unique grouping key so they're not collapsed.
-        entities = entities
-            .GroupBy(e => !string.IsNullOrEmpty(e.DataSource) && !string.IsNullOrEmpty(e.SyncIdentifier)
-                ? $"sync|{e.DataSource}|{e.SyncIdentifier}"
-                : $"id|{e.Id}")
-            .Select(g => g.Last())
-            .ToList();
-
-        // DB-level SyncIdentifier upsert: match any existing rows keyed by
-        // (DataSource, SyncIdentifier) and update them in place. Everything
-        // else falls through to the insert path below.
-        var syncKeyed = entities
-            .Where(e => !string.IsNullOrEmpty(e.DataSource) && !string.IsNullOrEmpty(e.SyncIdentifier))
-            .ToList();
-
-        var updatedEntities = new List<CarbIntakeEntity>();
-        if (syncKeyed.Count > 0)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var strategy = ctx.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var sources = syncKeyed.Select(e => e.DataSource!).Distinct().ToList();
-            var syncIds = syncKeyed.Select(e => e.SyncIdentifier!).Distinct().ToList();
-
-            // Over-fetches by a Cartesian amount; the partial unique index
-            // on (tenant_id, data_source, sync_identifier) keeps this cheap.
-            var existingRows = await _context.CarbIntakes
-                .Where(e => sources.Contains(e.DataSource!) && syncIds.Contains(e.SyncIdentifier!))
-                .ToListAsync(ct);
-
-            var existingByKey = existingRows
-                .GroupBy(e => $"{e.DataSource}|{e.SyncIdentifier}")
-                .ToDictionary(g => g.Key, g => g.First());
-
-            var toInsert = new List<CarbIntakeEntity>();
-            foreach (var entity in entities)
+            await using var tx = await ctx.Database.BeginTransactionAsync(ct);
+            var entities = records.Select(CarbIntakeMapper.ToEntity).ToList();
+            if (entities.Count == 0)
             {
-                var hasKey = !string.IsNullOrEmpty(entity.DataSource)
-                    && !string.IsNullOrEmpty(entity.SyncIdentifier);
-                if (hasKey && existingByKey.TryGetValue($"{entity.DataSource}|{entity.SyncIdentifier}", out var existing))
-                {
-                    // Update in place — mirror the single-record CreateAsync path via the mapper.
-                    var domain = CarbIntakeMapper.ToDomainModel(entity);
-                    CarbIntakeMapper.UpdateEntity(existing, domain);
-                    updatedEntities.Add(existing);
-                }
-                else
-                {
-                    toInsert.Add(entity);
-                }
+                await tx.CommitAsync(ct);
+                return [];
             }
 
-            if (updatedEntities.Count > 0)
-            {
-                // Persist updates before the insert-chunking loop clears the tracker.
-                await _context.SaveChangesAsync(ct);
-            }
-
-            entities = toInsert;
-        }
-
-        // Batch-level dedup: keep first occurrence per LegacyId
-        entities = entities
-            .GroupBy(e => e.LegacyId ?? e.Id.ToString())
-            .Select(g => g.First())
-            .ToList();
-
-        // DB-level dedup: filter out records whose LegacyId already exists
-        var legacyIds = entities
-            .Where(e => !string.IsNullOrEmpty(e.LegacyId))
-            .Select(e => e.LegacyId!)
-            .ToHashSet();
-
-        if (legacyIds.Count > 0)
-        {
-            var existingIds = await _context
-                .CarbIntakes.AsNoTracking()
-                .Where(e => legacyIds.Contains(e.LegacyId!))
-                .Select(e => e.LegacyId)
-                .ToListAsync(ct);
-
-            var existingSet = existingIds.ToHashSet();
+            // Intra-batch SyncIdentifier dedup: keep last occurrence per
+            // (DataSource, SyncIdentifier). Records without both keys keep a
+            // unique grouping key so they're not collapsed.
             entities = entities
-                .Where(e => string.IsNullOrEmpty(e.LegacyId) || !existingSet.Contains(e.LegacyId))
+                .GroupBy(e => !string.IsNullOrEmpty(e.DataSource) && !string.IsNullOrEmpty(e.SyncIdentifier)
+                    ? $"sync|{e.DataSource}|{e.SyncIdentifier}"
+                    : $"id|{e.Id}")
+                .Select(g => g.Last())
                 .ToList();
-        }
 
-        if (entities.Count > 0)
-        {
-            const int batchSize = 500;
-            foreach (var batch in entities.Chunk(batchSize))
+            // DB-level SyncIdentifier upsert: match any existing rows keyed by
+            // (DataSource, SyncIdentifier) and update them in place. Everything
+            // else falls through to the insert path below.
+            var syncKeyed = entities
+                .Where(e => !string.IsNullOrEmpty(e.DataSource) && !string.IsNullOrEmpty(e.SyncIdentifier))
+                .ToList();
+
+            var updatedEntities = new List<CarbIntakeEntity>();
+            if (syncKeyed.Count > 0)
             {
-                _context.CarbIntakes.AddRange(batch);
-                await _context.SaveChangesAsync(ct);
-                _context.ChangeTracker.Clear();
+                var sources = syncKeyed.Select(e => e.DataSource!).Distinct().ToList();
+                var syncIds = syncKeyed.Select(e => e.SyncIdentifier!).Distinct().ToList();
+
+                // Over-fetches by a Cartesian amount; the partial unique index
+                // on (tenant_id, data_source, sync_identifier) keeps this cheap.
+                var existingRows = await ctx.CarbIntakes.IgnoreQueryFilters()
+                    .Where(e => e.TenantId == ctx.TenantId)
+                    .Where(e => sources.Contains(e.DataSource!) && syncIds.Contains(e.SyncIdentifier!))
+                    .ToListAsync(ct);
+
+                var existingByKey = existingRows
+                    .GroupBy(e => $"{e.DataSource}|{e.SyncIdentifier}")
+                    .ToDictionary(g => g.Key, g => g.First());
+
+                var toInsert = new List<CarbIntakeEntity>();
+                foreach (var entity in entities)
+                {
+                    var hasKey = !string.IsNullOrEmpty(entity.DataSource)
+                        && !string.IsNullOrEmpty(entity.SyncIdentifier);
+                    if (hasKey && existingByKey.TryGetValue($"{entity.DataSource}|{entity.SyncIdentifier}", out var existing))
+                    {
+                        // Update in place — mirror the single-record CreateAsync path via the mapper.
+                        var domain = CarbIntakeMapper.ToDomainModel(entity);
+                        CarbIntakeMapper.UpdateEntity(existing, domain);
+                        updatedEntities.Add(existing);
+                    }
+                    else
+                    {
+                        toInsert.Add(entity);
+                    }
+                }
+
+                if (updatedEntities.Count > 0)
+                {
+                    // Persist updates before the insert-chunking loop clears the tracker.
+                    await ctx.SaveChangesAsync(ct);
+                }
+
+                entities = toInsert;
             }
 
-            // Insert-time deduplication: link saved records to canonical groups.
-            // Only runs on newly inserted entities — updated-in-place rows were
-            // already linked when first inserted.
-            try
-            {
-                var dedupInputs = entities.Select(e => new DeduplicationInput(
-                    RecordId: e.Id,
-                    Mills: new DateTimeOffset(e.Timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds(),
-                    DataSource: e.DataSource ?? "unknown",
-                    Criteria: new MatchCriteria { Carbs = e.Carbs, CarbsTolerance = 1.0 }
-                )).ToList();
+            // Batch-level dedup: keep first occurrence per LegacyId
+            entities = entities
+                .GroupBy(e => e.LegacyId ?? e.Id.ToString())
+                .Select(g => g.First())
+                .ToList();
 
-                await _deduplicationService.DeduplicateBatchAsync(RecordType.CarbIntake, dedupInputs, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to deduplicate {Type} batch of {Count}", "CarbIntake", entities.Count);
-            }
-        }
+            // DB-level dedup: filter out records whose LegacyId already exists
+            var legacyIds = entities
+                .Where(e => !string.IsNullOrEmpty(e.LegacyId))
+                .Select(e => e.LegacyId!)
+                .ToHashSet();
 
-        return updatedEntities.Concat(entities).Select(CarbIntakeMapper.ToDomainModel);
+            if (legacyIds.Count > 0)
+            {
+                var existingRecords = await ctx.CarbIntakes.IgnoreQueryFilters().AsNoTracking()
+                    .Where(e => e.TenantId == ctx.TenantId)
+                    .Where(e => legacyIds.Contains(e.LegacyId!))
+                    .Select(e => new { e.LegacyId, IsSoftDeleted = e.DeletedAt != null })
+                    .ToListAsync(ct);
+
+                var existingSet = existingRecords.Select(r => r.LegacyId).ToHashSet();
+                var softDeletedCount = existingRecords.Count(r => r.IsSoftDeleted);
+
+                if (softDeletedCount > 0)
+                    _logger.LogInformation(
+                        "Skipped {Count} previously-deleted {Type} records during import",
+                        softDeletedCount, "CarbIntake");
+
+                entities = entities
+                    .Where(e => string.IsNullOrEmpty(e.LegacyId) || !existingSet.Contains(e.LegacyId))
+                    .ToList();
+            }
+
+            if (entities.Count > 0)
+            {
+                const int batchSize = 500;
+                foreach (var batch in entities.Chunk(batchSize))
+                {
+                    ctx.CarbIntakes.AddRange(batch);
+                    await ctx.SaveChangesAsync(ct);
+                    ctx.ChangeTracker.Clear();
+                }
+
+                // Insert-time deduplication: link saved records to canonical groups.
+                // Only runs on newly inserted entities — updated-in-place rows were
+                // already linked when first inserted.
+                try
+                {
+                    var dedupInputs = entities.Select(e => new DeduplicationInput(
+                        RecordId: e.Id,
+                        Mills: new DateTimeOffset(e.Timestamp, TimeSpan.Zero).ToUnixTimeMilliseconds(),
+                        DataSource: e.DataSource ?? "unknown",
+                        Criteria: new MatchCriteria { Carbs = e.Carbs, CarbsTolerance = 1.0 }
+                    )).ToList();
+
+                    await _deduplicationService.DeduplicateBatchAsync(RecordType.CarbIntake, dedupInputs, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deduplicate {Type} batch of {Count}", "CarbIntake", entities.Count);
+                }
+            }
+
+            await tx.CommitAsync(ct);
+            return updatedEntities.Concat(entities).Select(CarbIntakeMapper.ToDomainModel);
+        });
     }
 }

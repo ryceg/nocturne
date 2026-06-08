@@ -9,6 +9,7 @@ using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models;
 using Nocturne.Infrastructure.Data;
 using Nocturne.Infrastructure.Data.Repositories.V4;
+using Nocturne.Infrastructure.Data.Services;
 using Nocturne.Tests.Shared.Infrastructure;
 using Xunit;
 
@@ -28,10 +29,11 @@ public class DeviceStatusDecomposerTests : IDisposable
     {
         _context = TestDbContextFactory.CreateInMemoryContext();
         _context.TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var apsRepo = new ApsSnapshotRepository(_context, NullLogger<ApsSnapshotRepository>.Instance);
-        var pumpRepo = new PumpSnapshotRepository(_context, NullLogger<PumpSnapshotRepository>.Instance);
-        var uploaderRepo = new UploaderSnapshotRepository(_context, NullLogger<UploaderSnapshotRepository>.Instance);
-        _extrasRepo = new DeviceStatusExtrasRepository(_context, NullLogger<DeviceStatusExtrasRepository>.Instance);
+        var ctxFactory = new TestTenantDbContextFactory(_context);
+        var apsRepo = new ApsSnapshotRepository(ctxFactory, NullLogger<ApsSnapshotRepository>.Instance);
+        var pumpRepo = new PumpSnapshotRepository(ctxFactory, NullLogger<PumpSnapshotRepository>.Instance);
+        var uploaderRepo = new UploaderSnapshotRepository(ctxFactory, NullLogger<UploaderSnapshotRepository>.Instance);
+        _extrasRepo = new DeviceStatusExtrasRepository(ctxFactory, NullLogger<DeviceStatusExtrasRepository>.Instance);
         _stateSpanServiceMock = new Mock<IStateSpanService>();
         _deviceServiceMock = new Mock<IDeviceService>();
 

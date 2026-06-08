@@ -18,6 +18,7 @@
   import CarbBreakdownBar from "$lib/components/treatments/CarbBreakdownBar.svelte";
   import FoodEntryDetails from "$lib/components/treatments/FoodEntryDetails.svelte";
   import { getMealNameForTime } from "$lib/constants/meal-times";
+  import { time } from "$lib/utils/formatting";
 
   interface MealsByDay {
     date: string;
@@ -69,14 +70,6 @@
     onReviewSuggestion,
   }: Props = $props();
 
-  function formatTime(mills: number | undefined): string {
-    if (!mills) return "—";
-    return new Date(mills).toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
   function getMealLabel(meal: MealEvent): string {
     const foods = meal.foods ?? [];
     if (foods.length === 0) {
@@ -96,7 +89,7 @@
 </script>
 
 <Card.Root>
-  <Card.Content class="p-0">
+  <Card.Content class="@container p-0">
     {#if isLoading}
       <div class="flex items-center justify-center p-12">
         <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
@@ -214,12 +207,10 @@
                 <!-- Main meal row -->
                 <Table.Row
                   class={cn(
-                    "transition-colors",
-                    hasFoods && "cursor-pointer",
+                    "transition-colors cursor-pointer",
                     isExpanded && "bg-accent/30"
                   )}
-                  onclick={() =>
-                    hasFoods && onToggleRow(meal.carbIntakes?.[0]?.id ?? "")}
+                  onclick={() => onAddFood(meal)}
                 >
                   <Table.Cell class="py-3">
                     {#if hasFoods}
@@ -242,7 +233,7 @@
                   </Table.Cell>
                   <Table.Cell class="py-3">
                     <div class="text-lg font-semibold tabular-nums">
-                      {formatTime(meal.carbIntakes?.[0]?.mills)}
+                      {meal.carbIntakes?.[0]?.mills ? time(meal.carbIntakes[0].mills) : "—"}
                     </div>
                   </Table.Cell>
                   <Table.Cell class="py-3">
@@ -262,19 +253,12 @@
                   </Table.Cell>
                   <Table.Cell class="py-3">
                     <div class="flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        class="w-24 cursor-pointer hover:opacity-80 transition-opacity"
-                        onclick={(e) => {
-                          e.stopPropagation();
-                          onAddFood(meal);
-                        }}
-                      >
+                      <div class="w-24">
                         <CarbBreakdownBar
                           {totalCarbs}
                           foods={meal.foods ?? []}
                         />
-                      </button>
+                      </div>
                       <span class="text-lg font-semibold tabular-nums">
                         {totalCarbs}g
                       </span>
@@ -338,7 +322,7 @@
                             Foods ({meal.foods?.length})
                           </div>
                           <div
-                            class="grid gap-2 md:grid-cols-2 lg:grid-cols-3"
+                            class="grid gap-2 @xl:grid-cols-2 @4xl:grid-cols-3"
                           >
                             {#each meal.foods ?? [] as food}
                               <div class="rounded-lg border bg-card p-3 text-sm transition-colors group relative hover:bg-accent/50">

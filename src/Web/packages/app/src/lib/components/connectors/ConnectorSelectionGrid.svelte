@@ -40,14 +40,14 @@
     </CardContent>
   </Card>
 {:else if servicesOverview?.availableConnectors}
-  <div class="space-y-4">
+  <div class="@container space-y-4">
     <div>
       <h3 class="text-lg font-semibold">Choose a connector</h3>
       <p class="text-sm text-muted-foreground">
         Select a data source to configure
       </p>
     </div>
-    <div class="grid gap-3 sm:grid-cols-2">
+    <div class="grid gap-3 @xl:grid-cols-2">
       {#each servicesOverview.availableConnectors as connector}
         <button
           class="flex items-center gap-4 p-4 rounded-lg border hover:border-primary/50 hover:bg-accent/50 transition-colors text-left group {connector.isConfigured
@@ -60,7 +60,7 @@
               ? 'bg-green-100 dark:bg-green-900/30'
               : 'bg-primary/10'}"
           >
-            <AppLogo icon={connector.icon} />
+            <AppLogo icon={connector.icon} invertMode />
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">

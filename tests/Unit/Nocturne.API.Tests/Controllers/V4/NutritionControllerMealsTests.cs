@@ -17,6 +17,7 @@ using Nocturne.Infrastructure.Data;
 using Nocturne.Infrastructure.Data.Entities;
 using Nocturne.Infrastructure.Data.Entities.V4;
 using Nocturne.Infrastructure.Data.Repositories.V4;
+using Nocturne.Tests.Shared.Infrastructure;
 using Xunit;
 
 namespace Nocturne.API.Tests.Controllers.V4;
@@ -55,13 +56,14 @@ public class NutritionControllerMealsTests : IDisposable
 
         var dedupMock = new Mock<IDeduplicationService>();
         var auditMock = new Mock<IAuditContext>().Object;
+        var ctxFactory = new TestTenantDbContextFactory(_dbContext);
         _bolusRepo = new BolusRepository(
-            _dbContext,
+            ctxFactory,
             dedupMock.Object,
             auditMock,
             NullLogger<BolusRepository>.Instance);
         _carbIntakeRepo = new CarbIntakeRepository(
-            _dbContext,
+            ctxFactory,
             dedupMock.Object,
             auditMock,
             NullLogger<CarbIntakeRepository>.Instance);

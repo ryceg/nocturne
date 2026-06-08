@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Nocturne.Connectors.Core.Extensions;
@@ -6,6 +7,8 @@ using Nocturne.Connectors.Core.Interfaces;
 using Nocturne.Connectors.Core.Services;
 using Nocturne.Connectors.Dexcom.Configurations;
 using Nocturne.Connectors.Dexcom.Services;
+
+[assembly: InternalsVisibleTo("Nocturne.Connectors.Dexcom.Tests")]
 
 namespace Nocturne.Connectors.Dexcom;
 

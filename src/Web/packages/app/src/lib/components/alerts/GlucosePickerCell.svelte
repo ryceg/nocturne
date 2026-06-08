@@ -36,21 +36,25 @@
   }: Props = $props();
 
   const tz = getLocalTimeZone();
+
+  const ariaLabel = $derived(
+    date.toDate(tz).toLocaleDateString(locale, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  );
 </script>
 
 <button
   type="button"
   {disabled}
   {onclick}
-  aria-label={date.toDate(tz).toLocaleDateString(locale, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })}
+  aria-label={ariaLabel}
   aria-pressed={selected || isStart || isEnd}
   class={cn(
-    "relative h-16 rounded-md border bg-background overflow-hidden transition-colors",
+    "relative h-16 w-full rounded-md border bg-background overflow-hidden transition-colors",
     "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset",
     inMonth ? "border-border/60" : "border-transparent opacity-40",
     disabled && "cursor-not-allowed opacity-30",

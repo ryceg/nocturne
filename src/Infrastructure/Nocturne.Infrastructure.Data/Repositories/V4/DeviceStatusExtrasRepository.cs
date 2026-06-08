@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Nocturne.Core.Contracts.V4.Repositories;
 using Nocturne.Core.Models.V4;
 using Nocturne.Infrastructure.Data.Mappers.V4;
+using Nocturne.Infrastructure.Data.Services;
 
 namespace Nocturne.Infrastructure.Data.Repositories.V4;
 
@@ -11,17 +12,17 @@ namespace Nocturne.Infrastructure.Data.Repositories.V4;
 /// </summary>
 public class DeviceStatusExtrasRepository : IDeviceStatusExtrasRepository
 {
-    private readonly NocturneDbContext _context;
+    private readonly ITenantDbContextFactory _contextFactory;
     private readonly ILogger<DeviceStatusExtrasRepository> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeviceStatusExtrasRepository"/> class.
     /// </summary>
-    /// <param name="context">The database context.</param>
+    /// <param name="contextFactory">The tenant database context factory.</param>
     /// <param name="logger">The logger instance.</param>
-    public DeviceStatusExtrasRepository(NocturneDbContext context, ILogger<DeviceStatusExtrasRepository> logger)
+    public DeviceStatusExtrasRepository(ITenantDbContextFactory contextFactory, ILogger<DeviceStatusExtrasRepository> logger)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _logger = logger;
     }
 
@@ -33,9 +34,10 @@ public class DeviceStatusExtrasRepository : IDeviceStatusExtrasRepository
     /// <returns>The created device status extras.</returns>
     public async Task<DeviceStatusExtras> CreateAsync(DeviceStatusExtras model, CancellationToken ct = default)
     {
+        await using var ctx = await _contextFactory.CreateAsync(ct);
         var entity = DeviceStatusExtrasMapper.ToEntity(model);
-        _context.DeviceStatusExtras.Add(entity);
-        await _context.SaveChangesAsync(ct);
+        ctx.DeviceStatusExtras.Add(entity);
+        await ctx.SaveChangesAsync(ct);
         return DeviceStatusExtrasMapper.ToDomainModel(entity);
     }
 
@@ -51,7 +53,8 @@ public class DeviceStatusExtrasRepository : IDeviceStatusExtrasRepository
         var ids = correlationIds.ToList();
         if (ids.Count == 0) return [];
 
-        var entities = await _context.DeviceStatusExtras
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var entities = await ctx.DeviceStatusExtras
             .AsNoTracking()
             .Where(e => ids.Contains(e.CorrelationId))
             .ToListAsync(ct);
@@ -66,9 +69,10 @@ public class DeviceStatusExtrasRepository : IDeviceStatusExtrasRepository
     /// <returns>The number of deleted records.</returns>
     public async Task<int> DeleteByCorrelationIdAsync(Guid correlationId, CancellationToken ct = default)
     {
-        return await _context.DeviceStatusExtras
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        return await ctx.DeviceStatusExtras
             .Where(e => e.CorrelationId == correlationId)
-            .ExecuteDeleteAsync(ct);
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.DeletedAt, DateTime.UtcNow), ct);
     }
 
     /// <inheritdoc />
@@ -91,31 +95,49 @@ public class DeviceStatusExtrasRepository : IDeviceStatusExtrasRepository
             .Select(e => e.CorrelationId)
             .ToHashSet();
 
-        if (correlationIds.Count > 0)
+        await using var ctx = await _contextFactory.CreateAsync(ct);
+        var strategy = ctx.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var existingIds = await _context
-                .DeviceStatusExtras.AsNoTracking()
-                .Where(e => correlationIds.Contains(e.CorrelationId))
-                .Select(e => e.CorrelationId)
-                .ToListAsync(ct);
+            await using var tx = await ctx.Database.BeginTransactionAsync(ct);
 
-            var existingSet = existingIds.ToHashSet();
-            entities = entities
-                .Where(e => !existingSet.Contains(e.CorrelationId))
-                .ToList();
-        }
+            if (correlationIds.Count > 0)
+            {
+                var existingRecords = await ctx.DeviceStatusExtras.IgnoreQueryFilters().AsNoTracking()
+                    .Where(e => e.TenantId == ctx.TenantId)
+                    .Where(e => correlationIds.Contains(e.CorrelationId))
+                    .Select(e => new { e.CorrelationId, IsSoftDeleted = e.DeletedAt != null })
+                    .ToListAsync(ct);
 
-        if (entities.Count == 0)
-            return [];
+                var existingSet = existingRecords.Select(r => r.CorrelationId).ToHashSet();
+                var softDeletedCount = existingRecords.Count(r => r.IsSoftDeleted);
 
-        const int batchSize = 500;
-        foreach (var batch in entities.Chunk(batchSize))
-        {
-            _context.DeviceStatusExtras.AddRange(batch);
-            await _context.SaveChangesAsync(ct);
-            _context.ChangeTracker.Clear();
-        }
+                if (softDeletedCount > 0)
+                    _logger.LogInformation(
+                        "Skipped {Count} previously-deleted {Type} records during import",
+                        softDeletedCount, "DeviceStatusExtras");
 
-        return entities.Select(DeviceStatusExtrasMapper.ToDomainModel);
+                entities = entities
+                    .Where(e => !existingSet.Contains(e.CorrelationId))
+                    .ToList();
+            }
+
+            if (entities.Count == 0)
+            {
+                await tx.CommitAsync(ct);
+                return [];
+            }
+
+            const int batchSize = 500;
+            foreach (var batch in entities.Chunk(batchSize))
+            {
+                ctx.DeviceStatusExtras.AddRange(batch);
+                await ctx.SaveChangesAsync(ct);
+                ctx.ChangeTracker.Clear();
+            }
+
+            await tx.CommitAsync(ct);
+            return entities.Select(DeviceStatusExtrasMapper.ToDomainModel);
+        });
     }
 }

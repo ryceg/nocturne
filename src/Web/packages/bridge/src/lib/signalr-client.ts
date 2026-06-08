@@ -20,6 +20,10 @@ interface SignalRConfig {
   connectionHeaders?: Record<string, string>;
 }
 
+function isSetupRequiredError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('"setupRequired":true');
+}
+
 class SignalRClient {
   private messageHandler: MessageTranslator;
   private dataConnection: HubConnection | null = null;
@@ -77,11 +81,16 @@ class SignalRClient {
       }
 
       if (this.configHubUrl) {
-        const keyHash = createHash("sha1")
+        const keyHash = createHash("sha256")
           .update(this.instanceKey)
           .digest("hex");
         this.configConnection = this.buildConnection(this.configHubUrl, {
-          headers: { "X-Instance-Key": keyHash },
+          // X-Instance-Service marks this as a genuine service call so the
+          // API honors the instance key (a bare key is ignored).
+          headers: {
+            "X-Instance-Key": keyHash,
+            "X-Instance-Service": "nocturne-bridge",
+          },
         });
         this.setupConfigEventHandlers();
 
@@ -94,7 +103,7 @@ class SignalRClient {
       this.reconnectAttempts = 0;
     } catch (error) {
       logger.error("Failed to connect to SignalR hub:", error);
-      await this.handleReconnect();
+      await this.handleReconnect(isSetupRequiredError(error));
     } finally {
       this.isConnecting = false;
     }
@@ -281,7 +290,7 @@ class SignalRClient {
       );
     }
     try {
-      const secretHash = createHash("sha1")
+      const secretHash = createHash("sha256")
         .update(this.instanceKey)
         .digest("hex")
         .toLowerCase();
@@ -341,7 +350,7 @@ class SignalRClient {
     }
 
     try {
-      const secretHash = createHash("sha1")
+      const secretHash = createHash("sha256")
         .update(this.instanceKey)
         .digest("hex")
         .toLowerCase();
@@ -361,8 +370,8 @@ class SignalRClient {
     }
   }
 
-  private async handleReconnect(): Promise<void> {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+  private async handleReconnect(isSetupRequired = false): Promise<void> {
+    if (!isSetupRequired && this.reconnectAttempts >= this.maxReconnectAttempts) {
       logger.error(
         `Maximum reconnection attempts (${this.maxReconnectAttempts}) exceeded`,
       );
@@ -375,8 +384,11 @@ class SignalRClient {
       this.maxReconnectDelay,
     );
 
+    const attemptLabel = isSetupRequired
+      ? `setup pending, attempt ${this.reconnectAttempts}`
+      : `attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`;
     logger.info(
-      `Attempting to reconnect to SignalR hub in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
+      `Attempting to reconnect to SignalR hub in ${delay}ms (${attemptLabel})`,
     );
 
     setTimeout(() => {

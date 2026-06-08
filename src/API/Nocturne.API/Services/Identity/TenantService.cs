@@ -53,7 +53,7 @@ public partial class TenantService : ITenantService
         // Abuse vectors
         "account", "billing", "security", "password", "verify",
         // Platform
-        "monitoring", "alerts", "bridge", "connect",
+        "monitoring", "alerts", "bridge", "connect", "share",
         // Reserved words
         "null", "undefined", "default", "test", "example",
         // Healthcare
@@ -112,7 +112,7 @@ public partial class TenantService : ITenantService
         // Seed default roles for this tenant
         await _roleService.SeedRolesForTenantAsync(tenant.Id, ct);
 
-        // Create Public subject membership (no roles = unconfigured sentinel)
+        // Create Public subject membership (no roles = private by default)
         await CreatePublicSubjectMembershipAsync(context, tenant.Id, ct);
 
         // Seed bundled known OAuth clients (Trio, xDrip+, etc.)
@@ -149,7 +149,7 @@ public partial class TenantService : ITenantService
         // Seed default roles for this tenant (but don't assign an owner)
         await _roleService.SeedRolesForTenantAsync(tenant.Id, ct);
 
-        // Create Public subject membership (no roles = unconfigured sentinel)
+        // Create Public subject membership (no roles = private by default)
         await CreatePublicSubjectMembershipAsync(context, tenant.Id, ct);
 
         // Seed bundled known OAuth clients (Trio, xDrip+, etc.)
@@ -202,13 +202,15 @@ public partial class TenantService : ITenantService
                     m.Id,
                     m.SubjectId,
                     m.Subject?.Name,
+                    m.Subject != null && m.Subject.IsSystemSubject,
                     m.MemberRoles.Select(mr => new TenantMemberRoleDto(
                         mr.TenantRoleId, mr.TenantRole.Name, mr.TenantRole.Slug)).ToList(),
                     m.DirectPermissions,
                     m.Label,
                     m.LimitTo24Hours,
                     m.LastUsedAt,
-                    m.SysCreatedAt))
+                    m.SysCreatedAt,
+                    m.Subject != null && m.Subject.IsPlatformAdmin))
                 .ToList());
     }
 
@@ -418,7 +420,7 @@ public partial class TenantService : ITenantService
                 }
                 await context.SaveChangesAsync(ct);
 
-                // Create Public subject membership (no roles = unconfigured sentinel)
+                // Create Public subject membership (no roles = private by default)
                 var publicSubject = await context.Subjects
                     .FirstOrDefaultAsync(s => s.IsSystemSubject && s.Name == "Public", ct);
 

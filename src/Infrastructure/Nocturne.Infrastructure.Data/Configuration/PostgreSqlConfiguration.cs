@@ -44,4 +44,10 @@ public class PostgreSqlConfiguration
     /// Command timeout in seconds
     /// </summary>
     public int CommandTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Maximum number of physical connections in the Npgsql connection pool.
+    /// Increase alongside Postgres max_connections when deploying at high concurrency.
+    /// </summary>
+    public int MaxPoolSize { get; set; } = 100;
 }

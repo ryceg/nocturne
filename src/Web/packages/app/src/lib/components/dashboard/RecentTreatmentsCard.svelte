@@ -8,7 +8,7 @@
     CardTitle,
   } from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
-  import { formatTime } from "$lib/utils";
+  import { time } from "$lib/utils/formatting";
   import { getRealtimeStore } from "$lib/stores/realtime-store.svelte";
   import { EntryEditDialog } from "$lib/components/entries";
 
@@ -54,6 +54,8 @@
         return entry.data.text ?? "Note";
       case "deviceEvent":
         return entry.data.eventType ?? "Device Event";
+      case "basalInjection":
+        return entry.data.units ? `${entry.data.units}u basal` : "Long-acting injection";
     }
   }
 
@@ -69,6 +71,8 @@
         return entry.data.isAnnouncement ? "Announcement" : "";
       case "deviceEvent":
         return entry.data.notes ?? "";
+      case "basalInjection":
+        return entry.data.insulinContext?.insulinName ?? "";
     }
   }
 </script>
@@ -118,7 +122,7 @@
                     {/if}
                   </div>
                   <div class="text-sm text-muted-foreground">
-                    {formatTime(entry.data.mills!)}
+                    {time(entry.data.mills!)}
                   </div>
                 </div>
               </div>

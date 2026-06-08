@@ -21,7 +21,7 @@ public class ApsSnapshotRepositoryBulkCreateTests : IDisposable
         var dbName = $"aps_snapshot_bulk_tests_{Guid.NewGuid()}";
         _context = TestDbContextFactory.CreateInMemoryContext(dbName);
         _context.TenantId = TenantA;
-        _repository = new ApsSnapshotRepository(_context, NullLogger<ApsSnapshotRepository>.Instance);
+        _repository = new ApsSnapshotRepository(new TestTenantDbContextFactory(_context), NullLogger<ApsSnapshotRepository>.Instance);
     }
 
     public void Dispose()

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getChangelog, type ChangelogRelease } from "$lib/data/portal.remote";
+    import { getChangelog, type ChangelogRelease } from "$lib/data/portal";
     import { Button } from "@nocturne/ui/ui/button";
     import { marked } from "marked";
     import {

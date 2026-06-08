@@ -5,6 +5,7 @@
   import { Label } from "$lib/components/ui/label";
   import { AlertTriangle, Loader2 } from "lucide-svelte";
   import * as InputOTP from "$lib/components/ui/input-otp";
+  import type { PinInput } from "bits-ui";
 
   interface Props {
     open?: boolean;
@@ -33,20 +34,7 @@
   async function handleVerify() {
     if (loading) return;
     if (verifyCode.length !== 6) return;
-
-    loading = true;
-    error = null;
-
-    try {
-      await onVerify(verifyCode, label);
-    } catch (err) {
-      error =
-        err instanceof Error
-          ? err.message
-          : "Verification failed. Check the code and try again.";
-    } finally {
-      loading = false;
-    }
+    await onVerify(verifyCode, label);
   }
 
   function handleCancel() {
@@ -97,7 +85,7 @@
         <Label>Verification code</Label>
         <div class="flex justify-center">
           <InputOTP.Root maxlength={6} bind:value={verifyCode} onComplete={handleVerify}>
-            {#snippet children({ cells })}
+            {#snippet children({ cells }: { cells: PinInput.CellProps["cell"][] })}
               <InputOTP.Group>
                 {#each cells.slice(0, 3) as cell}
                   <InputOTP.Slot {cell} />

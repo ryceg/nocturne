@@ -73,7 +73,6 @@ describe("ScheduleEditor", () => {
 		});
 
 		// Trash button should not be present with only 1 entry
-		const delete_buttons = page.getByRole("button").filter({ hasText: /Trash/i });
 		// Since it's an icon button with no text, check there are no ghost icon buttons
 		// The delete button has a Trash2 icon - with a single entry it shouldn't render
 		await expect.element(page.getByText("U/hr")).toBeVisible();

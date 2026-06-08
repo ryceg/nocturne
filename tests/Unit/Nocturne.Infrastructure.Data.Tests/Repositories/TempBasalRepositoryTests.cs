@@ -26,7 +26,7 @@ public class TempBasalRepositoryTests : IDisposable
         _context = TestDbContextFactory.CreateInMemoryContext();
         _context.TenantId = TenantA;
         _repository = new TempBasalRepository(
-            _context,
+            new TestTenantDbContextFactory(_context),
             new Mock<IDeduplicationService>().Object,
             new Mock<IAuditContext>().Object,
             NullLogger<TempBasalRepository>.Instance);

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Nocturne.Connectors.Core.Extensions;
 using Nocturne.Connectors.Core.Interfaces;
 using Nocturne.Connectors.Core.Services;
@@ -19,8 +20,25 @@ public class NightscoutConnectorInstaller : IConnectorInstaller
             configuration,
             "Nightscout");
 
+        // Direct singleton of the startup config. The connector service and write-back
+        // sinks no longer take this dependency (they go through IConnectorRegistration /
+        // IConnectorConfigurationLoader), but the compatibility proxy stack —
+        // RequestForwardingService, NightscoutTransitionController, CompatibilityController,
+        // CompatibilityProxyHealthCheck — still injects NightscoutConnectorConfiguration
+        // directly. Those should be migrated to the loader pattern as a followup, at which
+        // point this registration can be removed.
+        services.AddSingleton(nightscoutConfig);
+
         if (!nightscoutConfig.Enabled)
             return;
+
+        // Server resolver — Nightscout URLs come from per-tenant config, not a server mapping
+        services.AddSingleton<IConnectorServerResolver<NightscoutConnectorConfiguration>>(
+            new ConnectorServerResolver<NightscoutConnectorConfiguration>(null, null, null));
+        services.AddScoped<IConnectorConfigurationLoader<NightscoutConnectorConfiguration>,
+            ConnectorConfigurationLoader<NightscoutConnectorConfiguration>>();
+        services.TryAddSingleton<IConnectorTokenCache, ConnectorTokenCache>();
+        services.TryAddSingleton<IConnectorCacheInvalidator>(sp => sp.GetRequiredService<IConnectorTokenCache>());
 
         // URL comes from user config (possibly loaded from DB at runtime),
         // so configure it at registration time only if already available.

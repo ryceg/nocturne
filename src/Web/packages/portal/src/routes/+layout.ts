@@ -14,6 +14,8 @@ import {
 import { building } from '$app/environment'
 import type { Load } from '@sveltejs/kit'
 
+export const prerender = true;
+
 export const load: Load = async ({ url }) => {
     // Query param takes highest priority (not available during prerendering)
     const queryLocale = building ? null : url.searchParams.get('locale')

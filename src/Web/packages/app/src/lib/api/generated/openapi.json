@@ -762,6 +762,444 @@
         }
       }
     },
+    "/api/v4/insulin/basal-injections": {
+      "post": {
+        "tags": [
+          "Basal Injection"
+        ],
+        "summary": "Creates a new record and returns it with a `Location` header pointing to the created resource.",
+        "description": "`Timestamp` must be set on the mapped model; requests that resolve to a default timestamp are rejected with `400 Bad Request`.\n            \nOn success, responds with `201 Created` and a `Location` header containing the URL of the newly created record.",
+        "operationId": "BasalInjection_Create",
+        "requestBody": {
+          "x-name": "request",
+          "description": "The data used to create the record.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBasalInjectionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasalInjection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "form"
+      },
+      "get": {
+        "tags": [
+          "Basal Injection"
+        ],
+        "summary": "Lists records with pagination, optional date range, device, and source filtering.",
+        "description": "The `sort` parameter accepts exactly two values:\n- `timestamp_asc` — oldest records first\n- `timestamp_desc` — newest records first (default)\n            \nUse `limit` and `offset` together for paginated access to large result sets.",
+        "operationId": "BasalInjection_GetAll",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Inclusive start of the date range filter.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            },
+            "x-position": 1
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Inclusive end of the date range filter.",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            },
+            "x-position": 2
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 3
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 4
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort order for results by timestamp. Defaults to `timestamp_desc`.",
+            "schema": {
+              "type": "string",
+              "default": "timestamp_desc"
+            },
+            "x-position": 5
+          },
+          {
+            "name": "device",
+            "in": "query",
+            "description": "Optional filter to restrict results to a specific device.",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 6
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "description": "Optional filter to restrict results to a specific data source.",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 7
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfBasalInjection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/insulin/basal-injections/{id}": {
+      "put": {
+        "tags": [
+          "Basal Injection"
+        ],
+        "summary": "Updates an existing record by ID and returns the updated record.",
+        "description": "Returns `404 Not Found` if no record with the given id exists.\n            \n`Timestamp` must be set on the mapped model; requests that resolve to a default timestamp are rejected with `400 Bad Request`.",
+        "operationId": "BasalInjection_Update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the record to update.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "description": "The data to apply to the existing record.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBasalInjectionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasalInjection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "form"
+      },
+      "delete": {
+        "tags": [
+          "Basal Injection"
+        ],
+        "summary": "Deletes a record by ID.",
+        "description": "Returns `204 No Content` on success, or `404 Not Found` if no record with the given id exists.",
+        "operationId": "BasalInjection_Delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the record to delete.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      },
+      "get": {
+        "tags": [
+          "Basal Injection"
+        ],
+        "summary": "Retrieves a single record by its unique identifier.",
+        "description": "Returns `404 Not Found` if no record with the given id exists.",
+        "operationId": "BasalInjection_GetById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasalInjection"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/insulin/basal-injections/deleted": {
+      "get": {
+        "tags": [
+          "Basal Injection"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "BasalInjection_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfBasalInjection"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/insulin/basal-injections/{id}/restore": {
+      "post": {
+        "tags": [
+          "Basal Injection"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "BasalInjection_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasalInjection"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/insulin/basal-injections/restore": {
+      "post": {
+        "tags": [
+          "Basal Injection"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "BasalInjection_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BasalInjection"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
     "/api/v4/insulin/calculations": {
       "post": {
         "tags": [
@@ -1063,6 +1501,141 @@
           }
         },
         "x-remote-type": "query"
+      }
+    },
+    "/api/v4/insulin/calculations/deleted": {
+      "get": {
+        "tags": [
+          "Bolus Calculation"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "BolusCalculation_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfBolusCalculation"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/insulin/calculations/{id}/restore": {
+      "post": {
+        "tags": [
+          "Bolus Calculation"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "BolusCalculation_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BolusCalculation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/insulin/calculations/restore": {
+      "post": {
+        "tags": [
+          "Bolus Calculation"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "BolusCalculation_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BolusCalculation"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
       }
     },
     "/api/v4/insulin/boluses": {
@@ -1410,6 +1983,141 @@
             }
           }
         }
+      }
+    },
+    "/api/v4/insulin/boluses/deleted": {
+      "get": {
+        "tags": [
+          "Bolus"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "Bolus_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfBolus"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/insulin/boluses/{id}/restore": {
+      "post": {
+        "tags": [
+          "Bolus"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "Bolus_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bolus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/insulin/boluses/restore": {
+      "post": {
+        "tags": [
+          "Bolus"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "Bolus_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Bolus"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
       }
     },
     "/api/v4/connector-food-entries/import": {
@@ -2416,6 +3124,141 @@
           }
         },
         "x-remote-type": "query"
+      }
+    },
+    "/api/v4/observations/notes/deleted": {
+      "get": {
+        "tags": [
+          "Note"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "Note_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfNote"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/observations/notes/{id}/restore": {
+      "post": {
+        "tags": [
+          "Note"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "Note_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/observations/notes/restore": {
+      "post": {
+        "tags": [
+          "Note"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "Note_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Note"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
       }
     },
     "/api/v4/nutrition/carbs": {
@@ -5245,6 +6088,46 @@
         "x-remote-type": "query"
       }
     },
+    "/api/v4/profile/set-default/{profileName}": {
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Set a profile as the active (default) profile. Clears IsDefault on all other profiles.",
+        "operationId": "Profile_SetDefaultProfile",
+        "parameters": [
+          {
+            "name": "profileName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetProfileSummary",
+          "GetTherapySettings"
+        ]
+      }
+    },
     "/api/v4/profile/records": {
       "get": {
         "tags": [
@@ -6985,6 +7868,1258 @@
         "x-remote-type": "command"
       }
     },
+    "/api/v4/admin/access-requests": {
+      "get": {
+        "tags": [
+          "Access Request"
+        ],
+        "operationId": "AccessRequest_GetPendingRequests",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccessRequestDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/admin/access-requests/{subjectId}/approve": {
+      "post": {
+        "tags": [
+          "Access Request"
+        ],
+        "operationId": "AccessRequest_Approve",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveAccessRequestRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/admin/access-requests/{subjectId}/deny": {
+      "post": {
+        "tags": [
+          "Access Request"
+        ],
+        "operationId": "AccessRequest_Deny",
+        "parameters": [
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/admin/connectors/{tenantId}": {
+      "get": {
+        "tags": [
+          "Connector Admin"
+        ],
+        "summary": "List the connectors a target tenant has configured, with their last-sync and health state.",
+        "description": "Lets an admin inspect the data gap (last successful sync, health, last error) before deciding\nto reset cursors.",
+        "operationId": "ConnectorAdmin_GetTenantConnectors",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "description": "The target tenant.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantConnectorsDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/admin/connectors/{tenantId}/reset-cursors": {
+      "post": {
+        "tags": [
+          "Connector Admin"
+        ],
+        "summary": "Enqueue a background reset of the sync cursor for every connector configured on a target\ntenant, forcing a re-pull of history. Use after fixing a connector bug to push corrected data\nto an affected tenant.",
+        "description": "A full re-pull can take minutes per connector — far longer than gateway/proxy/browser request\ntimeouts — so the work runs on a background job that outlives the request. This returns\n202 Accepted with a job id immediately; poll GetResetJobStatus for\nper-connector progress, and CancelResetJob to stop it.",
+        "operationId": "ConnectorAdmin_ResetTenantCursors",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "description": "The target tenant whose connectors should be re-pulled.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "description": "Optional lower bound and data-type filter, mirroring the per-tenant reset endpoint.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminResetCursorsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorResetJobInfo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/admin/connectors/jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "Connector Admin"
+        ],
+        "summary": "Get the progress of a connector cursor reset job, including per-connector outcomes as they land.",
+        "operationId": "ConnectorAdmin_GetResetJobStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "The job id returned by ResetTenantCursors.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorResetJobStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/admin/connectors/jobs/{jobId}/cancel": {
+      "post": {
+        "tags": [
+          "Connector Admin"
+        ],
+        "summary": "Request cancellation of a running connector cursor reset job. Connectors already re-pulled\nkeep their committed data; the fan-out simply stops before the next connector.",
+        "operationId": "ConnectorAdmin_CancelResetJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "The job id to cancel.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetResetJobStatus"
+        ]
+      }
+    },
+    "/api/auth/platform-access": {
+      "get": {
+        "tags": [
+          "Platform Access"
+        ],
+        "summary": "Mint a platform-access grant for the given tenant slug and redirect the operator into the\ntenant. Bounces through OIDC login if there is no session yet; 403s if the session is not a\nplatform admin.",
+        "operationId": "PlatformAccess_Access",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "query",
+            "description": "Target tenant slug.",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/admin/platform-settings": {
+      "get": {
+        "tags": [
+          "Platform Settings"
+        ],
+        "summary": "Returns all platform setting categories with enabled status and configured field names.\nSecrets are never returned — only which fields have been set.",
+        "operationId": "PlatformSettings_GetAll",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformSettingsSummary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/admin/platform-settings/{category}": {
+      "get": {
+        "tags": [
+          "Platform Settings"
+        ],
+        "summary": "Returns a single platform setting category.",
+        "operationId": "PlatformSettings_Get",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformSettingsSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      },
+      "put": {
+        "tags": [
+          "Platform Settings"
+        ],
+        "summary": "Upserts platform settings for a category. Blank fields preserve existing values.\nReturns restartRequired: true — the SvelteKit frontend must be restarted for changes to take effect.",
+        "operationId": "PlatformSettings_Upsert",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertPlatformSettingsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetAll",
+          "Get"
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Platform Settings"
+        ],
+        "summary": "Deletes platform settings for a category, removing all stored credentials.",
+        "operationId": "PlatformSettings_Delete",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetAll",
+          "Get"
+        ]
+      }
+    },
+    "/api/v4/admin/platform-settings/decrypted": {
+      "get": {
+        "tags": [
+          "Platform Settings"
+        ],
+        "summary": "Returns decrypted credentials for all configured platforms.\nRestricted to instance-key authentication only (server-to-server).",
+        "operationId": "PlatformSettings_GetAllDecrypted",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformCredentials"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/admin/tenants": {
+      "get": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_GetAll",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      },
+      "post": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_Create",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTenantRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantCreatedDto"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetAll"
+        ]
+      }
+    },
+    "/api/v4/admin/tenants/{id}": {
+      "get": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_GetById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDetailDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      },
+      "put": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_Update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTenantRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetAll",
+          "GetById"
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_Delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetAll"
+        ]
+      }
+    },
+    "/api/v4/admin/tenants/{id}/members": {
+      "post": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_AddMember",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMemberRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetById"
+        ]
+      }
+    },
+    "/api/v4/admin/tenants/{id}/members/{subjectId}": {
+      "delete": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_RemoveMember",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetById"
+        ]
+      }
+    },
+    "/api/v4/admin/tenants/{id}/invites": {
+      "post": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_CreateInvite",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMemberInviteRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberInviteResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetById"
+        ]
+      },
+      "get": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_ListInvites",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberInviteInfo"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/admin/tenants/{id}/invites/{inviteId}": {
+      "delete": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_RevokeInvite",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "inviteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetById",
+          "ListInvites"
+        ]
+      }
+    },
+    "/api/v4/admin/tenants/provision": {
+      "post": {
+        "tags": [
+          "Tenant"
+        ],
+        "operationId": "Tenant_Provision",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetAll"
+        ]
+      }
+    },
+    "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials": {
+      "get": {
+        "tags": [
+          "Tenant"
+        ],
+        "summary": "Lists passkey credentials and OIDC identities for a member subject.",
+        "operationId": "Tenant_GetMemberCredentials",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectCredentialsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/oidc": {
+      "post": {
+        "tags": [
+          "Tenant"
+        ],
+        "summary": "Attaches an OIDC identity to a member subject.",
+        "operationId": "Tenant_AttachOidcIdentity",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 2
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAttachOidcRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 3
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetMemberCredentials"
+        ]
+      }
+    },
+    "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/passkey/{credentialId}": {
+      "delete": {
+        "tags": [
+          "Tenant"
+        ],
+        "summary": "Removes a passkey credential from a member subject.",
+        "operationId": "Tenant_RemovePasskeyCredential",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetMemberCredentials"
+        ]
+      }
+    },
+    "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/oidc/{identityId}": {
+      "delete": {
+        "tags": [
+          "Tenant"
+        ],
+        "summary": "Removes an OIDC identity from a member subject.",
+        "operationId": "Tenant_RemoveOidcIdentity",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "identityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetMemberCredentials"
+        ]
+      }
+    },
     "/api/v4/compatibility/config": {
       "get": {
         "tags": [
@@ -7971,6 +10106,64 @@
         "x-remote-type": "command"
       }
     },
+    "/api/v4/services/connectors/{id}/reset-cursor": {
+      "post": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Reset a connector's sync cursor for the current tenant and re-pull historical data.",
+        "description": "Nocturne does not persist a sync cursor — each data type resumes from the latest record\nalready stored. This endpoint forces a fresh ingest of history by running an explicit-range\nsync (an upper bound of \"now\" bypasses the per-type catch-up cursors), so the effect is a\ncursor reset. Re-ingested records are deduplicated on their idempotency keys (see the\n\"Syncing\" guide), so it is safe to run after fixing a connector bug to push corrected data\nto a tenant.\n            \nLatency: this runs synchronously. A full-history re-pull with no lower bound\nre-ingests every data type over the connector's entire history (glucose can be tens of\nthousands of records), which is a multi-minute request and may approach or exceed\nreverse-proxy / browser timeouts. Scope it with from and/or dataTypes when\npossible. The cross-tenant equivalent\n(POST /api/v4/admin/connectors/{tenantId}/reset-cursors) runs as a background job to\navoid this.",
+        "operationId": "Services_ResetConnectorCursor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Connector ID (e.g., \"nightscout\", \"dexcom\").",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "description": "Optional lower bound and data-type filter. Omit from to re-pull all available history; omit dataTypes to reset every supported type.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetCursorRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "Sync result with success status and details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
     "/api/v4/services/connectors/{id}/sync-status": {
       "get": {
         "tags": [
@@ -8464,853 +10657,6 @@
             }
           }
         }
-      }
-    },
-    "/api/v4/admin/access-requests": {
-      "get": {
-        "tags": [
-          "Access Request"
-        ],
-        "operationId": "AccessRequest_GetPendingRequests",
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AccessRequestDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "query"
-      }
-    },
-    "/api/v4/admin/access-requests/{subjectId}/approve": {
-      "post": {
-        "tags": [
-          "Access Request"
-        ],
-        "operationId": "AccessRequest_Approve",
-        "parameters": [
-          {
-            "name": "subjectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApproveAccessRequestRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 2
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command"
-      }
-    },
-    "/api/v4/admin/access-requests/{subjectId}/deny": {
-      "post": {
-        "tags": [
-          "Access Request"
-        ],
-        "operationId": "AccessRequest_Deny",
-        "parameters": [
-          {
-            "name": "subjectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command"
-      }
-    },
-    "/api/v4/admin/tenants": {
-      "get": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_GetAll",
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TenantDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "query"
-      },
-      "post": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_Create",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTenantRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TenantCreatedDto"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetAll"
-        ]
-      }
-    },
-    "/api/v4/admin/tenants/{id}": {
-      "get": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_GetById",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TenantDetailDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "query"
-      },
-      "put": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_Update",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateTenantRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 2
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TenantDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetAll",
-          "GetById"
-        ]
-      },
-      "delete": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_Delete",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetAll"
-        ]
-      }
-    },
-    "/api/v4/admin/tenants/{id}/members": {
-      "post": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_AddMember",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddMemberRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 2
-        },
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetById"
-        ]
-      }
-    },
-    "/api/v4/admin/tenants/{id}/members/{subjectId}": {
-      "delete": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_RemoveMember",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          },
-          {
-            "name": "subjectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 2
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetById"
-        ]
-      }
-    },
-    "/api/v4/admin/tenants/{id}/invites": {
-      "post": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_CreateInvite",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateMemberInviteRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 2
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemberInviteResult"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetById"
-        ]
-      },
-      "get": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_ListInvites",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MemberInviteInfo"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "query"
-      }
-    },
-    "/api/v4/admin/tenants/{id}/invites/{inviteId}": {
-      "delete": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_RevokeInvite",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          },
-          {
-            "name": "inviteId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 2
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetById",
-          "ListInvites"
-        ]
-      }
-    },
-    "/api/v4/admin/tenants/provision": {
-      "post": {
-        "tags": [
-          "Tenant"
-        ],
-        "operationId": "Tenant_Provision",
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProvisionRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProvisionResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetAll"
-        ]
-      }
-    },
-    "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials": {
-      "get": {
-        "tags": [
-          "Tenant"
-        ],
-        "summary": "Lists passkey credentials and OIDC identities for a member subject.",
-        "operationId": "Tenant_GetMemberCredentials",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          },
-          {
-            "name": "subjectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 2
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubjectCredentialsDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "query"
-      }
-    },
-    "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/oidc": {
-      "post": {
-        "tags": [
-          "Tenant"
-        ],
-        "summary": "Attaches an OIDC identity to a member subject.",
-        "operationId": "Tenant_AttachOidcIdentity",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          },
-          {
-            "name": "subjectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 2
-          }
-        ],
-        "requestBody": {
-          "x-name": "request",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminAttachOidcRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 3
-        },
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetMemberCredentials"
-        ]
-      }
-    },
-    "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/passkey/{credentialId}": {
-      "delete": {
-        "tags": [
-          "Tenant"
-        ],
-        "summary": "Removes a passkey credential from a member subject.",
-        "operationId": "Tenant_RemovePasskeyCredential",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          },
-          {
-            "name": "subjectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 2
-          },
-          {
-            "name": "credentialId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 3
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetMemberCredentials"
-        ]
-      }
-    },
-    "/api/v4/admin/tenants/{id}/members/{subjectId}/credentials/oidc/{identityId}": {
-      "delete": {
-        "tags": [
-          "Tenant"
-        ],
-        "summary": "Removes an OIDC identity from a member subject.",
-        "operationId": "Tenant_RemoveOidcIdentity",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 1
-          },
-          {
-            "name": "subjectId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 2
-          },
-          {
-            "name": "identityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            },
-            "x-position": 3
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-remote-type": "command",
-        "x-remote-invalidates": [
-          "GetMemberCredentials"
-        ]
       }
     },
     "/api/v4/alert-sounds": {
@@ -12325,6 +13671,302 @@
         ]
       }
     },
+    "/api/v4/membership-requests": {
+      "post": {
+        "tags": [
+          "Membership Request"
+        ],
+        "summary": "Submit a request to join the current tenant.",
+        "operationId": "MembershipRequest_CreateRequest",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMembershipRequestRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateMembershipRequestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      },
+      "get": {
+        "tags": [
+          "Membership Request"
+        ],
+        "summary": "List all pending membership requests for the current tenant.",
+        "operationId": "MembershipRequest_GetPendingRequests",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MembershipRequestDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/membership-requests/mine": {
+      "get": {
+        "tags": [
+          "Membership Request"
+        ],
+        "summary": "Get the current user's membership request for this tenant, if any.",
+        "operationId": "MembershipRequest_GetMyRequest",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipRequestDto"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/membership-requests/{id}/approve": {
+      "post": {
+        "tags": [
+          "Membership Request"
+        ],
+        "summary": "Approve a membership request and add the user as a tenant member.",
+        "operationId": "MembershipRequest_ApproveRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveMembershipRequestRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecideMembershipRequestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/membership-requests/{id}/deny": {
+      "post": {
+        "tags": [
+          "Membership Request"
+        ],
+        "summary": "Deny a membership request.",
+        "operationId": "MembershipRequest_DenyRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecideMembershipRequestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/membership-requests/settings": {
+      "get": {
+        "tags": [
+          "Membership Request"
+        ],
+        "summary": "Get whether this tenant currently lets people request to become a member.",
+        "operationId": "MembershipRequest_GetMembershipRequestSettings",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipRequestSettingsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      },
+      "put": {
+        "tags": [
+          "Membership Request"
+        ],
+        "summary": "Enable or disable whether people can request to become a member. Independent of public access.",
+        "operationId": "MembershipRequest_SetMembershipRequestSettings",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMembershipRequestSettingsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipRequestSettingsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetMembershipRequestSettings"
+        ]
+      }
+    },
     "/api/v4/me/permissions": {
       "get": {
         "tags": [
@@ -12633,6 +14275,210 @@
         "x-remote-type": "command",
         "x-remote-invalidates": [
           "GetRoles"
+        ]
+      }
+    },
+    "/api/v4/share": {
+      "get": {
+        "tags": [
+          "Share Link"
+        ],
+        "summary": "Get the current public share link state.",
+        "operationId": "ShareLink_GetShareLink",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareLinkDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      },
+      "delete": {
+        "tags": [
+          "Share Link"
+        ],
+        "summary": "Disable public sharing and invalidate the current link.",
+        "operationId": "ShareLink_DisableShareLink",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareLinkDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetShareLink"
+        ]
+      }
+    },
+    "/api/v4/share/rotate": {
+      "post": {
+        "tags": [
+          "Share Link"
+        ],
+        "summary": "Mint a new share token — enables sharing, or rotates an existing link. The previous link\nstops working immediately.",
+        "operationId": "ShareLink_RotateShareLink",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareLinkDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetShareLink"
+        ]
+      }
+    },
+    "/api/v4/share/full-history": {
+      "put": {
+        "tags": [
+          "Share Link"
+        ],
+        "summary": "Choose whether the public view shows full history or only the last 24 hours.",
+        "operationId": "ShareLink_SetShareLinkFullHistory",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetShareFullHistoryRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareLinkDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetShareLink"
+        ]
+      }
+    },
+    "/api/v4/share/scopes": {
+      "put": {
+        "tags": [
+          "Share Link"
+        ],
+        "summary": "Set which data categories anonymous viewers can see. Scopes must be read-permission atoms\ndrawn from TenantPermissions.PublicShareScopes; an empty list keeps the link live but\nshares nothing.",
+        "operationId": "ShareLink_SetShareLinkScopes",
+        "requestBody": {
+          "x-name": "request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetShareScopesRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareLinkDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command",
+        "x-remote-invalidates": [
+          "GetShareLink"
         ]
       }
     },
@@ -14308,6 +16154,141 @@
         "x-remote-type": "query"
       }
     },
+    "/api/v4/observations/bg-checks/deleted": {
+      "get": {
+        "tags": [
+          "BG Check"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "BGCheck_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfBGCheck"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/observations/bg-checks/{id}/restore": {
+      "post": {
+        "tags": [
+          "BG Check"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "BGCheck_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BGCheck"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/observations/bg-checks/restore": {
+      "post": {
+        "tags": [
+          "BG Check"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "BGCheck_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BGCheck"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
     "/api/v4/glucose/calibrations": {
       "get": {
         "tags": [
@@ -14603,6 +16584,141 @@
         "x-remote-type": "query"
       }
     },
+    "/api/v4/glucose/calibrations/deleted": {
+      "get": {
+        "tags": [
+          "Calibration"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "Calibration_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfCalibration"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/glucose/calibrations/{id}/restore": {
+      "post": {
+        "tags": [
+          "Calibration"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "Calibration_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Calibration"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/glucose/calibrations/restore": {
+      "post": {
+        "tags": [
+          "Calibration"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "Calibration_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Calibration"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
     "/api/v4/glucose/meter": {
       "get": {
         "tags": [
@@ -14896,6 +17012,141 @@
           }
         },
         "x-remote-type": "query"
+      }
+    },
+    "/api/v4/glucose/meter/deleted": {
+      "get": {
+        "tags": [
+          "Meter Glucose"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "MeterGlucose_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfMeterGlucose"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/glucose/meter/{id}/restore": {
+      "post": {
+        "tags": [
+          "Meter Glucose"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "MeterGlucose_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeterGlucose"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/glucose/meter/restore": {
+      "post": {
+        "tags": [
+          "Meter Glucose"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "MeterGlucose_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MeterGlucose"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
       }
     },
     "/api/v4/glucose/sensor": {
@@ -15232,6 +17483,141 @@
             }
           }
         }
+      }
+    },
+    "/api/v4/glucose/sensor/deleted": {
+      "get": {
+        "tags": [
+          "Sensor Glucose"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "SensorGlucose_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfSensorGlucose"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/glucose/sensor/{id}/restore": {
+      "post": {
+        "tags": [
+          "Sensor Glucose"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "SensorGlucose_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorGlucose"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/glucose/sensor/restore": {
+      "post": {
+        "tags": [
+          "Sensor Glucose"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "SensorGlucose_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SensorGlucose"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
       }
     },
     "/api/v4/dev-only/admin/snapshot": {
@@ -16546,6 +18932,141 @@
           }
         },
         "x-remote-type": "query"
+      }
+    },
+    "/api/v4/observations/device-events/deleted": {
+      "get": {
+        "tags": [
+          "Device Event"
+        ],
+        "summary": "Lists soft-deleted records available for restoration, ordered by deletion date (newest first).",
+        "operationId": "DeviceEvent_ListDeleted",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return. Defaults to `100`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            },
+            "x-position": 1
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination. Defaults to `0`.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseOfDeviceEvent"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/observations/device-events/{id}/restore": {
+      "post": {
+        "tags": [
+          "Device Event"
+        ],
+        "summary": "Restores a soft-deleted record by ID.",
+        "description": "Returns `200 OK` with the restored record, or `404 Not Found` if no soft-deleted record with the given id exists.",
+        "operationId": "DeviceEvent_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the soft-deleted record.",
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceEvent"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
+      }
+    },
+    "/api/v4/observations/device-events/restore": {
+      "post": {
+        "tags": [
+          "Device Event"
+        ],
+        "summary": "Restores multiple soft-deleted records by their IDs.",
+        "description": "Returns `200 OK` with the restored records. IDs that don't match a soft-deleted record are silently ignored.",
+        "operationId": "DeviceEvent_BulkRestore",
+        "requestBody": {
+          "x-name": "ids",
+          "description": "The unique identifiers of the soft-deleted records.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "guid"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceEvent"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "command"
       }
     },
     "/api/v4/device-status/pump": {
@@ -17934,6 +20455,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DashboardChartData"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": ""
+          }
+        },
+        "x-remote-type": "query"
+      }
+    },
+    "/api/v4/ChartData/basal-series": {
+      "get": {
+        "tags": [
+          "Chart Data"
+        ],
+        "summary": "Gets the basal delivery series for a time window without running the\nfull IOB/COB compute pipeline. Fetches only temp basals and profile\ndata, making it significantly cheaper than the dashboard endpoint.",
+        "operationId": "ChartData_GetBasalSeries",
+        "parameters": [
+          {
+            "name": "startTime",
+            "in": "query",
+            "description": "Start of the requested window as a Unix timestamp in milliseconds.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "endTime",
+            "in": "query",
+            "description": "End of the requested window as a Unix timestamp in milliseconds.\n            Must be greater than startTime.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of BasalPoint representing basal delivery over time.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BasalPoint"
+                  }
                 }
               }
             }
@@ -19816,6 +22397,64 @@
             }
           }
         }
+      }
+    },
+    "/api/v4/Statistics/range-analytics": {
+      "get": {
+        "tags": [
+          "Statistics"
+        ],
+        "summary": "Extended glucose analytics for a date range, computed server-side. Fetches glucose,\nmanual boluses, and carb intakes for the window from the database and runs\nAnalyzeGlucoseDataExtended plus\nCalculateAveragedStats.",
+        "operationId": "Statistics_GetRangeAnalytics",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Start of the window (inclusive, UTC).",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "End of the window (exclusive, UTC).",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "x-position": 2
+          },
+          {
+            "name": "population",
+            "in": "query",
+            "description": "Diabetes population for clinical target assessment. Defaults to Type 1 adult.",
+            "schema": {
+              "default": 0,
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/DiabetesPopulation"
+                }
+              ]
+            },
+            "x-position": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The extended analytics and time-of-day averaged stats for the window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportAnalysisResult"
+                }
+              }
+            }
+          }
+        },
+        "x-remote-type": "query"
       }
     },
     "/api/v4/Statistics/gmi/{meanGlucose}": {
@@ -23682,6 +26321,7 @@
           "EaseOff",
           "Sleep",
           "Exercise",
+          "Liberty",
           "Suspended",
           "Off"
         ],
@@ -23693,6 +26333,7 @@
           "EaseOff",
           "Sleep",
           "Exercise",
+          "Liberty",
           "Suspended",
           "Off"
         ]
@@ -24020,6 +26661,8 @@
           "HeartRateReadWrite",
           "StepCountRead",
           "StepCountReadWrite",
+          "FoodRead",
+          "FoodReadWrite",
           "StatisticsRead",
           "HealthRead",
           "HealthReadWrite",
@@ -24043,6 +26686,8 @@
           "heartrate.readwrite",
           "stepcount.read",
           "stepcount.readwrite",
+          "food.read",
+          "food.readwrite",
           "statistics.read",
           "health.read",
           "health.readwrite",
@@ -24538,6 +27183,257 @@
           }
         }
       },
+      "BasalInjection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mills": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "utcOffset": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "device": {
+            "type": "string",
+            "nullable": true
+          },
+          "app": {
+            "type": "string",
+            "nullable": true
+          },
+          "dataSource": {
+            "type": "string",
+            "nullable": true
+          },
+          "syncIdentifier": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "legacyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "units": {
+            "type": "number",
+            "format": "double"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "insulinContext": {
+            "$ref": "#/components/schemas/TreatmentInsulinContext"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {}
+          }
+        }
+      },
+      "TreatmentInsulinContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "patientInsulinId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "insulinName": {
+            "type": "string"
+          },
+          "dia": {
+            "type": "number",
+            "format": "double"
+          },
+          "peak": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "curve": {
+            "type": "string"
+          },
+          "concentration": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CreateBasalInjectionRequest": {
+        "type": "object",
+        "description": "Request body for creating a new basal insulin injection record via the V4 API.",
+        "additionalProperties": false,
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "description": "When the basal insulin was injected. Cannot be more than 5 minutes in the future.",
+            "format": "date-time"
+          },
+          "utcOffset": {
+            "type": "integer",
+            "description": "UTC offset in minutes at the time of the event, for local-time display.",
+            "format": "int32",
+            "nullable": true
+          },
+          "device": {
+            "type": "string",
+            "description": "Identifier of the device used to record the injection (e.g. \"iPhone-app\").",
+            "nullable": true
+          },
+          "app": {
+            "type": "string",
+            "description": "Name of the application that submitted this record.",
+            "nullable": true
+          },
+          "dataSource": {
+            "type": "string",
+            "description": "Upstream data source identifier; required when SyncIdentifier is supplied.",
+            "nullable": true
+          },
+          "syncIdentifier": {
+            "type": "string",
+            "description": "Upstream sync identifier for deduplication, paired with DataSource.",
+            "nullable": true
+          },
+          "patientInsulinId": {
+            "type": "string",
+            "description": "Reference to the PatientInsulin used for this injection. The referenced\ninsulin's role must be Basal or Both. The server resolves this to a\nTreatmentInsulinContext snapshot at write time.",
+            "format": "guid"
+          },
+          "units": {
+            "type": "number",
+            "description": "Insulin units injected. Must be greater than zero.",
+            "format": "double"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional free-text user note.",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "Correlation identifier for grouping related events.",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateBasalInjectionRequest": {
+        "type": "object",
+        "description": "Request body for updating an existing basal insulin injection record via the V4 API.\nThe injection is identified by the route-level ID parameter.",
+        "additionalProperties": false,
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "description": "When the basal insulin was injected. Cannot be more than 5 minutes in the future.",
+            "format": "date-time"
+          },
+          "utcOffset": {
+            "type": "integer",
+            "description": "UTC offset in minutes at the time of the event, for local-time display.",
+            "format": "int32",
+            "nullable": true
+          },
+          "device": {
+            "type": "string",
+            "description": "Identifier of the device used to record the injection.",
+            "nullable": true
+          },
+          "app": {
+            "type": "string",
+            "description": "Name of the application that submitted this record.",
+            "nullable": true
+          },
+          "dataSource": {
+            "type": "string",
+            "description": "Upstream data source identifier; required when SyncIdentifier is supplied.",
+            "nullable": true
+          },
+          "syncIdentifier": {
+            "type": "string",
+            "description": "Upstream sync identifier for deduplication, paired with DataSource.",
+            "nullable": true
+          },
+          "patientInsulinId": {
+            "type": "string",
+            "description": "Reference to the PatientInsulin used for this injection. The referenced\ninsulin's role must be Basal or Both. The server resolves this to a\nTreatmentInsulinContext snapshot at write time.",
+            "format": "guid"
+          },
+          "units": {
+            "type": "number",
+            "description": "Insulin units injected. Must be greater than zero.",
+            "format": "double"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional free-text user note.",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "Correlation identifier for grouping related events.",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "PaginatedResponseOfBasalInjection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasalInjection"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo"
+          }
+        }
+      },
+      "PaginationInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "BolusCalculation": {
         "type": "object",
         "additionalProperties": false,
@@ -24804,24 +27700,6 @@
           }
         }
       },
-      "PaginationInfo": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "limit": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "offset": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
       "PaginatedResponseOfBolus": {
         "type": "object",
         "additionalProperties": false,
@@ -24997,34 +27875,6 @@
           "Manual",
           "Algorithm"
         ]
-      },
-      "TreatmentInsulinContext": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "patientInsulinId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "insulinName": {
-            "type": "string"
-          },
-          "dia": {
-            "type": "number",
-            "format": "double"
-          },
-          "peak": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "curve": {
-            "type": "string"
-          },
-          "concentration": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
       },
       "CreateBolusRequest": {
         "type": "object",
@@ -26366,6 +29216,10 @@
                 "nullable": true
               },
               "mills": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "date": {
                 "type": "integer",
                 "format": "int64"
               },
@@ -28797,6 +31651,9 @@
           "backgroundOpacity": {
             "type": "integer",
             "format": "int32"
+          },
+          "screensaverMode": {
+            "type": "boolean"
           }
         }
       },
@@ -31039,6 +33896,927 @@
           }
         }
       },
+      "AccessRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApproveAccessRequestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "directPermissions": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TenantConnectorsDto": {
+        "type": "object",
+        "description": "A tenant and the connectors it has configured.",
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "description": "The tenant id.",
+            "format": "guid"
+          },
+          "tenantSlug": {
+            "type": "string",
+            "description": "The tenant slug, for display."
+          },
+          "connectors": {
+            "type": "array",
+            "description": "One entry per configured connector.",
+            "items": {
+              "$ref": "#/components/schemas/TenantConnectorSummary"
+            }
+          }
+        }
+      },
+      "TenantConnectorSummary": {
+        "type": "object",
+        "description": "Sync/health summary for a single configured connector.",
+        "additionalProperties": false,
+        "properties": {
+          "connectorName": {
+            "type": "string",
+            "description": "The connector name (e.g. nightscout)."
+          },
+          "isHealthy": {
+            "type": "boolean",
+            "description": "Whether the connector last reported healthy."
+          },
+          "lastSuccessfulSync": {
+            "type": "string",
+            "description": "When the connector last completed a successful sync.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastSyncAttempt": {
+            "type": "string",
+            "description": "When the connector last attempted a sync.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastErrorMessage": {
+            "type": "string",
+            "description": "The most recent error message, if any.",
+            "nullable": true
+          }
+        }
+      },
+      "ConnectorResetJobInfo": {
+        "type": "object",
+        "description": "Summary returned when a reset job is created (202 Accepted).",
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The job id, used to poll status.",
+            "format": "guid"
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "The target tenant being reset.",
+            "format": "guid"
+          },
+          "tenantSlug": {
+            "type": "string",
+            "description": "The target tenant's slug, for display."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the job was created.",
+            "format": "date-time"
+          },
+          "state": {
+            "description": "The job's current state.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConnectorResetJobState"
+              }
+            ]
+          },
+          "totalConnectors": {
+            "type": "integer",
+            "description": "How many connectors the job will reset.",
+            "format": "int32"
+          }
+        }
+      },
+      "ConnectorResetJobState": {
+        "type": "string",
+        "description": "Lifecycle state of a connector cursor reset job.",
+        "x-enumNames": [
+          "Pending",
+          "Running",
+          "Completed",
+          "Failed",
+          "Cancelled"
+        ],
+        "enum": [
+          "Pending",
+          "Running",
+          "Completed",
+          "Failed",
+          "Cancelled"
+        ]
+      },
+      "AdminResetCursorsRequest": {
+        "type": "object",
+        "description": "Request body for a cross-tenant cursor reset. Mirrors the per-tenant\nResetCursorRequest shape.",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Optional lower bound for the re-pull. When null, all available history is re-ingested.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dataTypes": {
+            "type": "array",
+            "description": "Optional set of data types to reset. When null or empty, every supported data type is reset.",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/SyncDataType"
+            }
+          }
+        }
+      },
+      "SyncDataType": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Glucose",
+          "ManualBG",
+          "Calibrations",
+          "Boluses",
+          "CarbIntake",
+          "BGChecks",
+          "BolusCalculations",
+          "Notes",
+          "DeviceEvents",
+          "StateSpans",
+          "Profiles",
+          "DeviceStatus",
+          "Activity",
+          "Food"
+        ],
+        "enum": [
+          "Glucose",
+          "ManualBG",
+          "Calibrations",
+          "Boluses",
+          "CarbIntake",
+          "BGChecks",
+          "BolusCalculations",
+          "Notes",
+          "DeviceEvents",
+          "StateSpans",
+          "Profiles",
+          "DeviceStatus",
+          "Activity",
+          "Food"
+        ]
+      },
+      "ConnectorResetJobStatus": {
+        "type": "object",
+        "description": "A pollable snapshot of a reset job's progress.",
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The job id.",
+            "format": "guid"
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "The target tenant being reset.",
+            "format": "guid"
+          },
+          "tenantSlug": {
+            "type": "string",
+            "description": "The target tenant's slug, for display."
+          },
+          "state": {
+            "description": "The job's current lifecycle state.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConnectorResetJobState"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the job was created.",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "When the background work started, or null if not yet started.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "description": "When the job reached a terminal state, or null if still running.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "An error message when the whole job failed (not a single connector).",
+            "nullable": true
+          },
+          "totalConnectors": {
+            "type": "integer",
+            "description": "Total connectors the job will reset.",
+            "format": "int32"
+          },
+          "completedConnectors": {
+            "type": "integer",
+            "description": "How many connectors have finished (succeeded or failed).",
+            "format": "int32"
+          },
+          "connectors": {
+            "type": "array",
+            "description": "Per-connector progress, in configured order.",
+            "items": {
+              "$ref": "#/components/schemas/ConnectorResetConnectorProgress"
+            }
+          }
+        }
+      },
+      "ConnectorResetConnectorProgress": {
+        "type": "object",
+        "description": "Progress for a single connector within a reset job.",
+        "additionalProperties": false,
+        "properties": {
+          "connectorName": {
+            "type": "string",
+            "description": "The connector name (e.g. nightscout)."
+          },
+          "state": {
+            "description": "The connector's current state in this job.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConnectorResetConnectorState"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "A human-readable message for the outcome, once the connector has completed.",
+            "nullable": true
+          },
+          "result": {
+            "description": "The full sync result, once the connector has completed.",
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SyncResult"
+              }
+            ]
+          }
+        }
+      },
+      "ConnectorResetConnectorState": {
+        "type": "string",
+        "description": "State of a single connector within a reset job.",
+        "x-enumNames": [
+          "Pending",
+          "Running",
+          "Succeeded",
+          "Failed"
+        ],
+        "enum": [
+          "Pending",
+          "Running",
+          "Succeeded",
+          "Failed"
+        ]
+      },
+      "SyncResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "itemsSynced": {
+            "type": "object",
+            "x-dictionaryKey": {
+              "$ref": "#/components/schemas/SyncDataType"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "lastEntryTimes": {
+            "type": "object",
+            "x-dictionaryKey": {
+              "$ref": "#/components/schemas/SyncDataType"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PlatformSettingsSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "configuredFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldDefinition"
+            }
+          }
+        }
+      },
+      "FieldDefinition": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpsertPlatformSettingsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PlatformCredentials": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TenantDetailDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sysCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantMemberDto"
+            }
+          }
+        }
+      },
+      "TenantMemberDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "isSystemSubject": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantMemberRoleDto"
+            }
+          },
+          "directPermissions": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "limitTo24Hours": {
+            "type": "boolean"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sysCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isPlatformAdmin": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TenantMemberRoleDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateTenantRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateTenantRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "allowAccessRequests": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
+      "AddMemberRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "directPermissions": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "MemberInviteResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "token": {
+            "type": "string"
+          },
+          "inviteUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateMemberInviteRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "directPermissions": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxUses": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "limitTo24Hours": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MemberInviteInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "tenantName": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "roleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "directPermissions": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "limitTo24Hours": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "maxUses": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "useCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isValid": {
+            "type": "boolean"
+          },
+          "isExpired": {
+            "type": "boolean"
+          },
+          "isRevoked": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usedBy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InviteUsageInfo"
+            }
+          }
+        }
+      },
+      "InviteUsageInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProvisionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
+      "ProvisionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "ownerUsername": {
+            "type": "string"
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "credential": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProvisionCredentialData"
+              }
+            ]
+          },
+          "oidcIdentity": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProvisionOidcIdentityData"
+              }
+            ]
+          }
+        }
+      },
+      "ProvisionCredentialData": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "credentialId": {
+            "type": "string"
+          },
+          "publicKey": {
+            "type": "string"
+          },
+          "signCount": {
+            "type": "integer"
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aaGuid": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "ProvisionOidcIdentityData": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "oidcSubjectId": {
+            "type": "string"
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "SubjectCredentialsDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "passkeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyCredentialDto"
+            }
+          },
+          "oidcIdentities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OidcIdentityDto"
+            }
+          }
+        }
+      },
+      "PasskeyCredentialDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OidcIdentityDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AdminAttachOidcRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "oidcSubjectId": {
+            "type": "string"
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "ProxyConfigurationDto": {
         "type": "object",
         "description": "Proxy configuration DTO",
@@ -31714,89 +35492,6 @@
           }
         }
       },
-      "SyncResult": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "startTime": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "endTime": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "itemsSynced": {
-            "type": "object",
-            "x-dictionaryKey": {
-              "$ref": "#/components/schemas/SyncDataType"
-            },
-            "additionalProperties": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          "lastEntryTimes": {
-            "type": "object",
-            "x-dictionaryKey": {
-              "$ref": "#/components/schemas/SyncDataType"
-            },
-            "additionalProperties": {
-              "type": "string",
-              "format": "date-time",
-              "nullable": true
-            }
-          },
-          "errors": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "SyncDataType": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Glucose",
-          "ManualBG",
-          "Calibrations",
-          "Boluses",
-          "CarbIntake",
-          "BGChecks",
-          "BolusCalculations",
-          "Notes",
-          "DeviceEvents",
-          "StateSpans",
-          "Profiles",
-          "DeviceStatus",
-          "Activity",
-          "Food"
-        ],
-        "enum": [
-          "Glucose",
-          "ManualBG",
-          "Calibrations",
-          "Boluses",
-          "CarbIntake",
-          "BGChecks",
-          "BolusCalculations",
-          "Notes",
-          "DeviceEvents",
-          "StateSpans",
-          "Profiles",
-          "DeviceStatus",
-          "Activity",
-          "Food"
-        ]
-      },
       "SyncRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -31813,6 +35508,27 @@
           },
           "dataTypes": {
             "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncDataType"
+            }
+          }
+        }
+      },
+      "ResetCursorRequest": {
+        "type": "object",
+        "description": "Request body for resetting a connector's sync cursor and re-pulling history.",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Optional lower bound for the re-pull. When null, no lower bound is applied and all\navailable history is re-ingested.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dataTypes": {
+            "type": "array",
+            "description": "Optional set of data types to reset. When null or empty, every data type the connector\nsupports is re-pulled.",
+            "nullable": true,
             "items": {
               "$ref": "#/components/schemas/SyncDataType"
             }
@@ -31956,6 +35672,18 @@
           "head": {
             "type": "string",
             "nullable": true
+          },
+          "isDemo": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "nextResetAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "anonymousReadAccess": {
+            "type": "boolean"
           }
         }
       },
@@ -32077,7 +35805,9 @@
           "TelegramDm",
           "TelegramGroup",
           "WhatsApp",
-          "WhatsAppDm"
+          "WhatsAppDm",
+          "HomeAssistant",
+          "ResendEmail"
         ],
         "enum": [
           "web_push",
@@ -32091,7 +35821,9 @@
           "telegram_dm",
           "telegram_group",
           "whatsapp",
-          "whatsapp_dm"
+          "whatsapp_dm",
+          "home_assistant",
+          "resend_email"
         ]
       },
       "ChannelStatus": {
@@ -32246,516 +35978,6 @@
           "originalId": {
             "type": "string",
             "description": "Gets or sets the original MongoDB ObjectId, preserved for migration compatibility.",
-            "nullable": true
-          }
-        }
-      },
-      "AccessRequestDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "subjectId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ApproveAccessRequestRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "roleIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          "directPermissions": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "TenantDetailDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "isActive": {
-            "type": "boolean"
-          },
-          "sysCreatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "members": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TenantMemberDto"
-            }
-          }
-        }
-      },
-      "TenantMemberDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "subjectId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "name": {
-            "type": "string",
-            "nullable": true
-          },
-          "roles": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TenantMemberRoleDto"
-            }
-          },
-          "directPermissions": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "type": "string"
-            }
-          },
-          "label": {
-            "type": "string",
-            "nullable": true
-          },
-          "limitTo24Hours": {
-            "type": "boolean"
-          },
-          "lastUsedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "sysCreatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "TenantMemberRoleDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "roleId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          }
-        }
-      },
-      "CreateTenantRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "slug": {
-            "type": "string"
-          },
-          "displayName": {
-            "type": "string"
-          }
-        }
-      },
-      "UpdateTenantRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "displayName": {
-            "type": "string"
-          },
-          "isActive": {
-            "type": "boolean"
-          },
-          "allowAccessRequests": {
-            "type": "boolean",
-            "nullable": true
-          }
-        }
-      },
-      "AddMemberRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "subjectId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "roleIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          "directPermissions": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "MemberInviteResult": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "token": {
-            "type": "string"
-          },
-          "inviteUrl": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "CreateMemberInviteRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "roleIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          "directPermissions": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "type": "string"
-            }
-          },
-          "label": {
-            "type": "string",
-            "nullable": true
-          },
-          "expiresInDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxUses": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "limitTo24Hours": {
-            "type": "boolean"
-          }
-        }
-      },
-      "MemberInviteInfo": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "tenantId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "tenantName": {
-            "type": "string"
-          },
-          "createdByName": {
-            "type": "string"
-          },
-          "roleIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          "directPermissions": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "type": "string"
-            }
-          },
-          "label": {
-            "type": "string",
-            "nullable": true
-          },
-          "limitTo24Hours": {
-            "type": "boolean"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "maxUses": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "useCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "isValid": {
-            "type": "boolean"
-          },
-          "isExpired": {
-            "type": "boolean"
-          },
-          "isRevoked": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "usedBy": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InviteUsageInfo"
-            }
-          }
-        }
-      },
-      "InviteUsageInfo": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "subjectId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "name": {
-            "type": "string",
-            "nullable": true
-          },
-          "joinedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ProvisionResult": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "tenantId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "subjectId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "slug": {
-            "type": "string"
-          }
-        }
-      },
-      "ProvisionRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "slug": {
-            "type": "string"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "ownerUsername": {
-            "type": "string"
-          },
-          "ownerEmail": {
-            "type": "string"
-          },
-          "credential": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/ProvisionCredentialData"
-              }
-            ]
-          },
-          "oidcIdentity": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/ProvisionOidcIdentityData"
-              }
-            ]
-          }
-        }
-      },
-      "ProvisionCredentialData": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "credentialId": {
-            "type": "string"
-          },
-          "publicKey": {
-            "type": "string"
-          },
-          "signCount": {
-            "type": "integer"
-          },
-          "transports": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "aaGuid": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "subjectId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          }
-        }
-      },
-      "ProvisionOidcIdentityData": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "provider": {
-            "type": "string"
-          },
-          "oidcSubjectId": {
-            "type": "string"
-          },
-          "issuer": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "subjectId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          }
-        }
-      },
-      "SubjectCredentialsDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "passkeys": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PasskeyCredentialDto"
-            }
-          },
-          "oidcIdentities": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OidcIdentityDto"
-            }
-          }
-        }
-      },
-      "PasskeyCredentialDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "displayName": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "OidcIdentityDto": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "provider": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
-      "AdminAttachOidcRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "providerId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "oidcSubjectId": {
-            "type": "string"
-          },
-          "issuer": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string",
             "nullable": true
           }
         }
@@ -33368,6 +36590,9 @@
           "conditionType": {
             "$ref": "#/components/schemas/AlertConditionType"
           },
+          "severity": {
+            "$ref": "#/components/schemas/AlertRuleSeverity"
+          },
           "startedAt": {
             "type": "string",
             "format": "date-time"
@@ -33804,7 +37029,7 @@
           },
           "dndScheduleStart": {
             "type": "string",
-            "description": "Local-time start of the scheduled DND window (in Timezone).",
+            "description": "Local-time start of the scheduled DND window, interpreted in the patient's timezone.",
             "format": "time",
             "nullable": true
           },
@@ -33813,10 +37038,6 @@
             "description": "Local-time end of the scheduled DND window. Cross-midnight windows allowed.",
             "format": "time",
             "nullable": true
-          },
-          "timezone": {
-            "type": "string",
-            "description": "IANA timezone (e.g. Europe/London) for the scheduled window."
           }
         }
       },
@@ -33844,9 +37065,6 @@
             "type": "string",
             "format": "time",
             "nullable": true
-          },
-          "timezone": {
-            "type": "string"
           }
         }
       },
@@ -34988,6 +38206,106 @@
           }
         }
       },
+      "CreateMembershipRequestResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreateMembershipRequestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MembershipRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "subjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DecideMembershipRequestResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ApproveMembershipRequestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "MembershipRequestSettingsDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "allowRequests": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateMembershipRequestSettingsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "allowRequests": {
+            "type": "boolean"
+          }
+        }
+      },
       "CreateMyTenantRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -35068,6 +38386,60 @@
             "nullable": true
           },
           "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ShareLinkDto": {
+        "type": "object",
+        "description": "Current state of a tenant's single public share link.",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether a public share link is currently active."
+          },
+          "url": {
+            "type": "string",
+            "description": "The full share URL when enabled; null otherwise. The raw token is never returned separately.",
+            "nullable": true
+          },
+          "fullHistory": {
+            "type": "boolean",
+            "description": "When true the public view shows full history; when false, only the last 24 hours."
+          },
+          "scopes": {
+            "type": "array",
+            "description": "The data categories anonymous viewers can see, as read-permission atoms (e.g. glucose.read).\nA subset of PublicShareScopes.\nEmpty means the link is live but nothing is shared yet.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastAccessedAt": {
+            "type": "string",
+            "description": "When the share link was last accessed, or null if never (or not yet recorded).",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "SetShareFullHistoryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fullHistory": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SetShareScopesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scopes": {
             "type": "array",
             "items": {
               "type": "string"
@@ -35444,6 +38816,10 @@
             "nullable": true
           },
           "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "timezone": {
             "type": "string",
             "nullable": true
           },
@@ -36604,13 +39980,6 @@
             "format": "date-time",
             "nullable": true
           },
-          "timezone": {
-            "type": "string"
-          },
-          "subjectName": {
-            "type": "string",
-            "nullable": true
-          },
           "allowAccessRequests": {
             "type": "boolean"
           },
@@ -37014,9 +40383,6 @@
           },
           "isActive": {
             "type": "boolean"
-          },
-          "timezone": {
-            "type": "string"
           },
           "createdAt": {
             "type": "string",
@@ -38864,6 +42230,12 @@
               "$ref": "#/components/schemas/BasalDeliverySpanDto"
             }
           },
+          "basalInjectionMarkers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasalInjectionMarkerDto"
+            }
+          },
           "systemEventMarkers": {
             "type": "array",
             "items": {
@@ -38971,6 +42343,7 @@
           "PumpModeExercise",
           "PumpModeSuspended",
           "PumpModeOff",
+          "PumpModeLiberty",
           "SystemEventAlarm",
           "SystemEventHazard",
           "SystemEventWarning",
@@ -39013,6 +42386,7 @@
           "pump-mode-exercise",
           "pump-mode-suspended",
           "pump-mode-off",
+          "pump-mode-liberty",
           "system-event-alarm",
           "system-event-hazard",
           "system-event-warning",
@@ -39228,6 +42602,27 @@
           },
           "strokeColor": {
             "$ref": "#/components/schemas/ChartColor"
+          }
+        }
+      },
+      "BasalInjectionMarkerDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "time": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "units": {
+            "type": "number",
+            "format": "double"
+          },
+          "insulinName": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -41748,6 +45143,21 @@
           }
         }
       },
+      "ReportAnalysisResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "$ref": "#/components/schemas/ExtendedGlucoseAnalytics"
+          },
+          "averagedStats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AveragedStats"
+            }
+          }
+        }
+      },
       "ClinicalAssessmentRequest": {
         "type": "object",
         "description": "Request model for clinical assessment",
@@ -43564,6 +46974,10 @@
           "isPlatformAdmin": {
             "type": "boolean",
             "description": "Whether this subject has platform-level admin access"
+          },
+          "isPlatformAccessGrant": {
+            "type": "boolean",
+            "description": "Whether this session is a short-lived platform-admin access grant on a tenant the\nsubject is NOT a member of (as opposed to ordinary membership). Authoritative signal\nfor the \"platform admin access\" indicator in the UI."
           },
           "avatarUrl": {
             "type": "string",

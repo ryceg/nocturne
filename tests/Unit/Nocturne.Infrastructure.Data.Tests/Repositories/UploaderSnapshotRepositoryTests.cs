@@ -21,7 +21,7 @@ public class UploaderSnapshotRepositoryTests : IDisposable
     {
         _context = TestDbContextFactory.CreateInMemoryContext();
         _context.TenantId = TenantA;
-        _repository = new UploaderSnapshotRepository(_context, NullLogger<UploaderSnapshotRepository>.Instance);
+        _repository = new UploaderSnapshotRepository(new TestTenantDbContextFactory(_context), NullLogger<UploaderSnapshotRepository>.Instance);
     }
 
     public void Dispose()

@@ -4,10 +4,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Nocturne.Infrastructure.Data.Entities;
 
 /// <summary>
-/// Tenant-level alert configuration: Do Not Disturb (manual + scheduled) and the timezone
-/// the scheduled DND window is interpreted in. One row per tenant; the row is created on
-/// first access. DND has two activation paths that share the same allowlist semantics — the
-/// per-rule <see cref="AlertRuleEntity.AllowThroughDnd"/> bypass applies to both.
+/// Tenant-level alert configuration: Do Not Disturb (manual + scheduled). One row per
+/// tenant; the row is created on first access. The scheduled DND window is interpreted
+/// in the patient's IANA timezone (<see cref="V4.PatientRecordEntity.Timezone"/>) — not
+/// stored here. DND has two activation paths that share the same allowlist semantics —
+/// the per-rule <see cref="AlertRuleEntity.AllowThroughDnd"/> bypass applies to both.
 /// </summary>
 [Table("tenant_alert_settings")]
 public class TenantAlertSettingsEntity : ITenantScoped
@@ -44,7 +45,7 @@ public class TenantAlertSettingsEntity : ITenantScoped
     [Column("dnd_schedule_enabled")]
     public bool DndScheduleEnabled { get; set; }
 
-    /// <summary>Local-time start of the scheduled DND window (in <see cref="Timezone"/>).</summary>
+    /// <summary>Local-time start of the scheduled DND window (in the patient's timezone).</summary>
     [Column("dnd_schedule_start")]
     public TimeOnly? DndScheduleStart { get; set; }
 
@@ -52,12 +53,6 @@ public class TenantAlertSettingsEntity : ITenantScoped
     /// (start &gt; end interpreted as wrapping over midnight).</summary>
     [Column("dnd_schedule_end")]
     public TimeOnly? DndScheduleEnd { get; set; }
-
-    /// <summary>IANA timezone (e.g. <c>Europe/London</c>) used to interpret the schedule
-    /// window. Falls back to UTC if the value cannot be resolved at evaluation time.</summary>
-    [Column("timezone")]
-    [MaxLength(64)]
-    public string Timezone { get; set; } = "UTC";
 
     /// <summary>When the row was created.</summary>
     [Column("created_at")]
